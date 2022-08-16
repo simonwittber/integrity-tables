@@ -1,73 +1,54 @@
-﻿using System.Collections;
-using System.Reflection.Metadata;
+﻿namespace Tables;
 
-namespace Tables;
-
-public delegate bool ConstraintDelegate<T>(T item);
-public delegate bool QueryDelegate<T>(T item);
-public delegate T ModifyDelegate<T>(T item);
-public delegate T OnInsertDelegate<T>(T item);
-public delegate T OnUpdateDelegate<T>(T oldItem, T newItem);
-public delegate int PrimaryKeyDelegate<T>(T item);
-public delegate void OnDeleteDelegate<T>(T item);
-
-public enum TriggerType
+public class Table<T> : ITable<T>
 {
-    OnCreate,
-    OnUpdate,
-    OnDelete
-}
-
-public class Table<T>
-{
-    
+    public OnDeleteDelegate<T> OnDelete = null;
     public OnInsertDelegate<T> OnInsert = null;
     public OnUpdateDelegate<T> OnUpdate = null;
-    public OnDeleteDelegate<T> OnDelete = null;
 
-    private readonly List<T> _rows = new();
+    private readonly List<(TriggerType, string, ConstraintDelegate<T>)> _constraints = new();
     private readonly List<int> _deletedRows = new();
     private readonly Dictionary<int, int> _index = new();
-    private readonly List<(TriggerType, string, ConstraintDelegate<T>)> _constraints = new();
-    readonly PrimaryKeyDelegate<T> _primaryKey;
+    private readonly PrimaryKeyGetterDelegate<T> _primaryKeyGetterFn;
+    private readonly List<T> _rows = new();
+
     public int RowCount => _rows.Count;
     
-    public Table(PrimaryKeyDelegate<T> primaryKeyFn)
+    public Table(PrimaryKeyGetterDelegate<T> primaryKeyGetterFn)
     {
-        this._primaryKey = primaryKeyFn;
+        _primaryKeyGetterFn = primaryKeyGetterFn;
     }
 
-    public bool Contains(int key)
+    public T this[int id]
     {
-        return _index.ContainsKey(key);
+        get => _rows[_index[id]];
+        set => SetItem(TriggerType.OnUpdate, _index[id], value);
     }
+
+    public bool ContainsKey(int key) => _index.ContainsKey(key);
     
-    public T Insert(T item)
+    public T Get(int id) => _rows[_index[id]];
+    
+    public void Delete(T row) => Delete(_primaryKeyGetterFn(row));
+
+    public T Add(T item)
     {
-        if (OnInsert != null) 
+        if (OnInsert != null)
             item = OnInsert(item);
         var index = _rows.Count;
         CheckConstraintsForItem(TriggerType.OnCreate, item);
         CheckConstraintsForItem(TriggerType.OnUpdate, item);
         _rows.Add(item);
-        _index.Add(_primaryKey(item), index);
+        _index.Add(_primaryKeyGetterFn(item), index);
         return item;
     }
-    
-    public T Get(int id)
-    {
-        var index = _index[id];
-        return _rows[index];
-    }
 
-    public int DeleteAndFlush(QueryDelegate<T> queryFn)
+    public int DeleteAndFlush(PredicateDelegate<T> predicateFn)
     {
-        var count = Apply(row => Delete(row), queryFn);
-        Flush();
+        var count = Apply(row => Delete(row), predicateFn);
+        FlushDeleteQueue();
         return count;
     }
-
-    public void Delete(T row) => Delete(_primaryKey(row));
 
     public void Delete(int id)
     {
@@ -76,7 +57,7 @@ public class Table<T>
         _deletedRows.Add(id);
     }
 
-    public int Flush()
+    public int FlushDeleteQueue()
     {
         var count = 0;
         for (var i = 0; i < _deletedRows.Count; i++)
@@ -84,26 +65,15 @@ public class Table<T>
             InternalDelete(_deletedRows[i]);
             count++;
         }
+
         _deletedRows.Clear();
         return count;
     }
-    
-    void InternalDelete(int id)
-    {
-        var index = _index[id];
-        var deletedRow = _rows[index];
-        var lastIndex = _rows.Count - 1;
-        var lastRow = _rows[lastIndex];
-        _rows[index] = lastRow;
-        _index[_primaryKey(lastRow)] = index;
-        _index.Remove(id);
-        _rows.RemoveAt(lastIndex);
-        OnDelete?.Invoke(deletedRow);
-    }
+
 
     public T Update(T item)
     {
-        var index = _primaryKey(item);
+        var index = _primaryKeyGetterFn(item);
         var currentRow = _rows[index];
         if (OnUpdate != null)
             item = OnUpdate(currentRow, item);
@@ -111,13 +81,13 @@ public class Table<T>
         return item;
     }
 
-    public int Update(ModifyDelegate<T> modifyFn, QueryDelegate<T> queryFn)
+    public int Update(ModifyDelegate<T> modifyFn, PredicateDelegate<T> predicateFn)
     {
         var modifiedCount = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
             var item = _rows[i];
-            if (queryFn(item))
+            if (predicateFn(item))
             {
                 var newItem = modifyFn(item);
                 if (OnUpdate != null)
@@ -125,55 +95,62 @@ public class Table<T>
                 SetItem(TriggerType.OnUpdate, i, newItem);
             }
         }
+
         return modifiedCount;
     }
-    
-    public int Apply(System.Action<T> action, QueryDelegate<T> queryFn)
+
+    public int Apply(Action<T> applyFn, PredicateDelegate<T> predicateFn)
     {
         var count = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
             var item = _rows[i];
-            if (!queryFn(item)) continue;
-            action(item);
+            if (!predicateFn(item)) continue;
+            applyFn(item);
             count++;
         }
+
         return count;
     }
-    
-    public bool Exists(QueryDelegate<T> queryFn)
+
+
+    public bool IsTrue(PredicateDelegate<T> predicateFn)
     {
         for (var i = 0; i < _rows.Count; i++)
         {
             var item = _rows[i];
-            if (queryFn(item)) return true;
+            if (predicateFn(item)) return true;
         }
+
         return false;
     }
+
     
-    public int Count(QueryDelegate<T> queryFn)
+    public int Count(PredicateDelegate<T> predicateFn)
     {
         var count = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
             var item = _rows[i];
-            if (queryFn(item)) count ++;
+            if (predicateFn(item)) count++;
         }
+
         return count;
     }
-    
-    public int Apply(System.Action<T> action)
+
+    public int Apply(Action<T> applyFn)
     {
         var count = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
             var item = _rows[i];
             count++;
-            action(item);
+            applyFn(item);
         }
+
         return count;
     }
-    
+
     public int Update(ModifyDelegate<T> modifyFn)
     {
         var count = 0;
@@ -183,22 +160,33 @@ public class Table<T>
             var newItem = modifyFn(item);
             if (OnUpdate != null)
                 newItem = OnUpdate(item, newItem);
-            SetItem(TriggerType.OnUpdate,i, newItem);
+            SetItem(TriggerType.OnUpdate, i, newItem);
             count++;
         }
+
         return count;
     }
-    
+
     public void AddConstraint(TriggerType triggerType, string constraintName, ConstraintDelegate<T> constraintFn)
     {
         _constraints.Add((triggerType, constraintName, constraintFn));
     }
-    
-    
-    void SetItem(TriggerType triggerType, int index, T item)
+
+
+    private void SetItem(TriggerType triggerType, int index, T item)
     {
         CheckConstraintsForItem(triggerType, item);
         _rows[index] = item;
+    }
+
+    public void AddRelationshipConstraint<TR>(string constraintName, ForeignKeyGetterDelegate<T> foreignKeyFn, Table<TR> otherTable)
+    {
+        AddConstraint(TriggerType.OnUpdate, constraintName, row => otherTable.ContainsKey(foreignKeyFn(row)));
+        otherTable.AddConstraint(TriggerType.OnDelete, constraintName, otherRow =>
+        {
+            var fk = otherTable._primaryKeyGetterFn(otherRow);
+            return !IsTrue(row => foreignKeyFn(row) == fk);
+        });
     }
 
     private void CheckConstraintsForItem(TriggerType triggerType, T item)
@@ -211,20 +199,16 @@ public class Table<T>
         }
     }
 
-    public T this[int id]
+    private void InternalDelete(int id)
     {
-        get => _rows[_index[id]];
-        set => SetItem(TriggerType.OnUpdate, _index[id], value);
-    }
-    
-    public void AddRelation<TR>(string name, Func<T, int> getForeignKeyFn, Table<TR> otherTable)
-    {
-        AddConstraint(TriggerType.OnUpdate, name, row => otherTable.Contains(getForeignKeyFn(row)));
-        otherTable.AddConstraint(TriggerType.OnDelete, name, otherRow =>
-        {
-            var fk = otherTable._primaryKey(otherRow);
-            return !Exists(row => getForeignKeyFn(row) == fk);
-        });
+        var index = _index[id];
+        var deletedRow = _rows[index];
+        var lastIndex = _rows.Count - 1;
+        var lastRow = _rows[lastIndex];
+        _rows[index] = lastRow;
+        _index[_primaryKeyGetterFn(lastRow)] = index;
+        _index.Remove(id);
+        _rows.RemoveAt(lastIndex);
+        OnDelete?.Invoke(deletedRow);
     }
 }
-

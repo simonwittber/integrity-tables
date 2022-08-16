@@ -23,7 +23,7 @@ public class SimpleTableTests
     {
         var table = new Table<TestRow>(i=>i.id);
         table.AddConstraint(TriggerType.OnUpdate,"Name Not Null", i => i.name != null);
-        var row = table.Insert(new TestRow() { id=23, name = "srw" });
+        var row = table.Add(new TestRow() { id=23, name = "srw" });
         Assert.AreEqual(23, row.id);
         var anotherRow = table.Get(23);
         Assert.AreEqual("srw", anotherRow.name);
@@ -39,7 +39,7 @@ public class SimpleTableTests
             return item;
         };
         
-        var row = table.Insert(new TestRow() { id=23, name = "srw" });
+        var row = table.Add(new TestRow() { id=23, name = "srw" });
         Assert.AreEqual("haha", row.name);
     }
     
@@ -55,7 +55,7 @@ public class SimpleTableTests
         };
         Assert.Throws<ConstraintException>(() =>
         {
-            table.Insert(new TestRow() { id=23, name = "srw" });
+            table.Add(new TestRow() { id=23, name = "srw" });
         });
 
     }
@@ -64,10 +64,10 @@ public class SimpleTableTests
     public void TestDelete()
     {
         var table = new Table<TestRow>(i=>i.id);
-        table.Insert(new TestRow() { id=23, name = "srw" });
-        table.Insert(new TestRow() { id=22, name = "srw" });
+        table.Add(new TestRow() { id=23, name = "srw" });
+        table.Add(new TestRow() { id=22, name = "srw" });
         table.Delete(23);
-        table.Flush();
+        table.FlushDeleteQueue();
         Assert.Throws<KeyNotFoundException>(() => table.Get(23));
     }
     
@@ -78,7 +78,7 @@ public class SimpleTableTests
         table.AddConstraint(TriggerType.OnUpdate,"Name Not Null", i => i.name != null);
         Assert.Throws<ConstraintException>(() =>
         {
-            var row = table.Insert(new TestRow() {id = 23, name = null});
+            var row = table.Add(new TestRow() {id = 23, name = null});
         });
     }
     
@@ -101,14 +101,14 @@ public class SimpleTableTests
         var persons = new Table<Person>(item => item.id);
         var locations = new Table<Location>(item => item.id);
         //persons.AddConstraint("location exists", person => locations.Contains(person.location_id));
-        persons.AddRelation("person_fk", i=>i.location_id, locations);
-        locations.Insert(new Location() {id = 1, name = "Here"});
+        persons.AddRelationshipConstraint("person_fk", i=>i.location_id, locations);
+        locations.Add(new Location() {id = 1, name = "Here"});
         Assert.Throws<ConstraintException>(() =>
         {
-            persons.Insert(new Person() {id = 0, location_id = 0, name = "Simon"});
+            persons.Add(new Person() {id = 0, location_id = 0, name = "Simon"});
         });
-        locations.Insert(new Location() {id = 0, name = "There"});
-        persons.Insert(new Person() {id = 0, location_id = 0, name = "Simon"});
+        locations.Add(new Location() {id = 0, name = "There"});
+        persons.Add(new Person() {id = 0, location_id = 0, name = "Simon"});
         Assert.Throws<ConstraintException>(() =>
         {
             locations.Delete(0);
