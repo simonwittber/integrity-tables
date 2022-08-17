@@ -1,13 +1,26 @@
 ﻿namespace Tables;
 
-public class Table<T> : ITable<T>
+
+public delegate bool ConstraintDelegate<T>(T item);
+public delegate bool PredicateDelegate<T>(T item);
+public delegate T ModifyDelegate<T>(T item);
+public delegate T OnInsertDelegate<T>(T item);
+public delegate T OnUpdateDelegate<T>(T oldItem, T newItem);
+public delegate int PrimaryKeyGetterDelegate<T>(T item);
+public delegate void OnDeleteDelegate<T>(T item);
+public delegate int ForeignKeyGetterDelegate<T>(T item);
+
+
+public class Table<T>
 {
     public OnDeleteDelegate<T> OnDelete = null;
     public OnInsertDelegate<T> OnInsert = null;
     public OnUpdateDelegate<T> OnUpdate = null;
 
     private readonly List<(TriggerType, string, ConstraintDelegate<T>)> _constraints = new();
-    private readonly List<int> _deletedRows = new();
+    private readonly List<T> _deletedRows = new();
+    private readonly List<T> _newRows = new();
+    private readonly List<T> _modifiedRows = new();
     private readonly Dictionary<int, int> _index = new();
     private readonly PrimaryKeyGetterDelegate<T> _primaryKeyGetterFn;
     private readonly List<T> _rows = new();
@@ -22,52 +35,65 @@ public class Table<T> : ITable<T>
     public T this[int id]
     {
         get => _rows[_index[id]];
-        set => SetItem(TriggerType.OnUpdate, _index[id], value);
+        set
+        {
+            var row = value;
+            if (OnUpdate != null)
+                row = OnUpdate.Invoke(_rows[_index[id]], row);
+            CheckConstraintsForItem(TriggerType.OnUpdate, row);
+            _rows[_index[id]] = row;
+        }
     }
 
     public bool ContainsKey(int key) => _index.ContainsKey(key);
     
     public T Get(int id) => _rows[_index[id]];
-    
-    public void Delete(T row) => Delete(_primaryKeyGetterFn(row));
+
+    public void Delete(T row)
+    {
+        OnDelete?.Invoke(row);
+        CheckConstraintsForItem(TriggerType.OnDelete, row);
+        _deletedRows.Add(row);
+    }
 
     public T Add(T item)
     {
         if (OnInsert != null)
             item = OnInsert(item);
-        var index = _rows.Count;
         CheckConstraintsForItem(TriggerType.OnCreate, item);
         CheckConstraintsForItem(TriggerType.OnUpdate, item);
-        _rows.Add(item);
-        _index.Add(_primaryKeyGetterFn(item), index);
+        _newRows.Add(item);
         return item;
     }
 
-    public int DeleteAndFlush(PredicateDelegate<T> predicateFn)
-    {
-        var count = Apply(row => Delete(row), predicateFn);
-        FlushDeleteQueue();
-        return count;
-    }
+    public int Delete(PredicateDelegate<T> predicateFn) => Apply(Delete, predicateFn);
 
-    public void Delete(int id)
-    {
-        var item = Get(id);
-        CheckConstraintsForItem(TriggerType.OnDelete, item);
-        _deletedRows.Add(id);
-    }
+    public void Delete(int id) => Delete(Get(id));
 
-    public int FlushDeleteQueue()
+    public void Commit()
     {
-        var count = 0;
+        for (var i = 0; i < _newRows.Count; i++)
+        {
+            var item = _newRows[i];
+            var index = _rows.Count;
+            _rows.Add(item);
+            _index.Add(_primaryKeyGetterFn(item), index);
+        }
+        _newRows.Clear();
+        
+        for (var i = 0; i < _modifiedRows.Count; i++)
+        {
+            var item = _modifiedRows[i];
+            var index = _index[_primaryKeyGetterFn(item)];
+            _rows[index] = item;
+        }
+        _modifiedRows.Clear();
+        
         for (var i = 0; i < _deletedRows.Count; i++)
         {
-            InternalDelete(_deletedRows[i]);
-            count++;
+            InternalDelete(_primaryKeyGetterFn(_deletedRows[i]));
         }
-
         _deletedRows.Clear();
-        return count;
     }
 
 
@@ -77,9 +103,11 @@ public class Table<T> : ITable<T>
         var currentRow = _rows[index];
         if (OnUpdate != null)
             item = OnUpdate(currentRow, item);
-        SetItem(TriggerType.OnUpdate, index, item);
+        CheckConstraintsForItem(TriggerType.OnUpdate, item);
+        _modifiedRows.Add(item);
         return item;
     }
+    
 
     public int Update(ModifyDelegate<T> modifyFn, PredicateDelegate<T> predicateFn)
     {
@@ -92,10 +120,10 @@ public class Table<T> : ITable<T>
                 var newItem = modifyFn(item);
                 if (OnUpdate != null)
                     newItem = OnUpdate(item, newItem);
-                SetItem(TriggerType.OnUpdate, i, newItem);
+                CheckConstraintsForItem(TriggerType.OnUpdate, newItem);
+                _modifiedRows.Add(newItem);
             }
         }
-
         return modifiedCount;
     }
 
@@ -109,7 +137,6 @@ public class Table<T> : ITable<T>
             applyFn(item);
             count++;
         }
-
         return count;
     }
 
@@ -121,7 +148,6 @@ public class Table<T> : ITable<T>
             var item = _rows[i];
             if (predicateFn(item)) return true;
         }
-
         return false;
     }
 
@@ -138,45 +164,31 @@ public class Table<T> : ITable<T>
         return count;
     }
 
-    public int Apply(Action<T> applyFn)
+    public void Apply(Action<T> applyFn)
     {
-        var count = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
             var item = _rows[i];
-            count++;
             applyFn(item);
         }
-
-        return count;
     }
 
-    public int Update(ModifyDelegate<T> modifyFn)
+    public void Update(ModifyDelegate<T> modifyFn)
     {
-        var count = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
-            var item = _rows[i];
-            var newItem = modifyFn(item);
+            var oldItem = _rows[i];
+            var newItem = modifyFn(oldItem);
             if (OnUpdate != null)
-                newItem = OnUpdate(item, newItem);
-            SetItem(TriggerType.OnUpdate, i, newItem);
-            count++;
+                newItem = OnUpdate(oldItem, newItem);
+            CheckConstraintsForItem(TriggerType.OnUpdate, newItem);
+            _modifiedRows.Add(newItem);
         }
-
-        return count;
     }
 
     public void AddConstraint(TriggerType triggerType, string constraintName, ConstraintDelegate<T> constraintFn)
     {
         _constraints.Add((triggerType, constraintName, constraintFn));
-    }
-
-
-    private void SetItem(TriggerType triggerType, int index, T item)
-    {
-        CheckConstraintsForItem(triggerType, item);
-        _rows[index] = item;
     }
 
     public void AddRelationshipConstraint<TR>(string constraintName, ForeignKeyGetterDelegate<T> foreignKeyFn, Table<TR> otherTable)

@@ -24,6 +24,7 @@ public class SimpleTableTests
         var table = new Table<TestRow>(i=>i.id);
         table.AddConstraint(TriggerType.OnUpdate,"Name Not Null", i => i.name != null);
         var row = table.Add(new TestRow() { id=23, name = "srw" });
+        table.Commit();
         Assert.AreEqual(23, row.id);
         var anotherRow = table.Get(23);
         Assert.AreEqual("srw", anotherRow.name);
@@ -66,8 +67,9 @@ public class SimpleTableTests
         var table = new Table<TestRow>(i=>i.id);
         table.Add(new TestRow() { id=23, name = "srw" });
         table.Add(new TestRow() { id=22, name = "srw" });
+        table.Commit();
         table.Delete(23);
-        table.FlushDeleteQueue();
+        table.Commit();
         Assert.Throws<KeyNotFoundException>(() => table.Get(23));
     }
     
@@ -100,7 +102,6 @@ public class SimpleTableTests
     {
         var persons = new Table<Person>(item => item.id);
         var locations = new Table<Location>(item => item.id);
-        //persons.AddConstraint("location exists", person => locations.Contains(person.location_id));
         persons.AddRelationshipConstraint("person_fk", i=>i.location_id, locations);
         locations.Add(new Location() {id = 1, name = "Here"});
         Assert.Throws<ConstraintException>(() =>
@@ -108,7 +109,9 @@ public class SimpleTableTests
             persons.Add(new Person() {id = 0, location_id = 0, name = "Simon"});
         });
         locations.Add(new Location() {id = 0, name = "There"});
+        locations.Commit();
         persons.Add(new Person() {id = 0, location_id = 0, name = "Simon"});
+        persons.Commit();
         Assert.Throws<ConstraintException>(() =>
         {
             locations.Delete(0);
