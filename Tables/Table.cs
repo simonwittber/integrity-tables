@@ -4,26 +4,27 @@
 public delegate bool ConstraintDelegate<T>(T item);
 public delegate bool PredicateDelegate<T>(T item);
 public delegate T ModifyDelegate<T>(T item);
+
+public delegate void RowAction<in T>(T item);
 public delegate T OnInsertDelegate<T>(T item);
 public delegate T OnUpdateDelegate<T>(T oldItem, T newItem);
 public delegate int PrimaryKeyGetterDelegate<T>(T item);
 public delegate void OnDeleteDelegate<T>(T item);
-public delegate int ForeignKeyGetterDelegate<T>(T item);
+public delegate int? ForeignKeyGetterDelegate<T>(T item);
 
-
-public class Table<T>
+public class Table<T> : ITable
 {
     public OnDeleteDelegate<T> OnDelete = null;
     public OnInsertDelegate<T> OnInsert = null;
     public OnUpdateDelegate<T> OnUpdate = null;
 
     private readonly List<(TriggerType, string, ConstraintDelegate<T>)> _constraints = new();
-    private readonly List<T> _deletedRows = new();
-    private readonly List<T> _newRows = new();
-    private readonly List<T> _modifiedRows = new();
+    private readonly Dictionary<int, T> _deletedRows = new();
+    private readonly List<int> _newRows = new();
+    private readonly Dictionary<int, T> _modifiedRows = new();
     private readonly Dictionary<int, int> _index = new();
     private readonly PrimaryKeyGetterDelegate<T> _primaryKeyGetterFn;
-    private readonly List<T> _rows = new();
+    private readonly List<Row<T>> _rows = new();
 
     public int RowCount => _rows.Count;
     
@@ -34,36 +35,71 @@ public class Table<T>
 
     public T this[int id]
     {
-        get => _rows[_index[id]];
+        get => _rows[_index[id]].data;
         set
         {
-            var row = value;
+            var newData = value;
+            var row = _rows[_index[id]];
             if (OnUpdate != null)
-                row = OnUpdate.Invoke(_rows[_index[id]], row);
-            CheckConstraintsForItem(TriggerType.OnUpdate, row);
+                newData = OnUpdate.Invoke(row.data, newData);
+            CheckConstraintsForItem(TriggerType.OnUpdate, newData);
+            row.data = newData;
             _rows[_index[id]] = row;
+        }
+    }
+
+    public bool IsDirty
+    {
+        get
+        {
+            for (var i = 0; i < _rows.Count; i++)
+            {
+                var row = _rows[i];
+                if (!row.committed) return true;
+            }
+            return false;
+        }
+    }
+
+    public void Begin()
+    {
+        if (IsDirty)
+        {
+            throw new Exception("Cannot start a transaction on a dirty table.");
         }
     }
 
     public bool ContainsKey(int key) => _index.ContainsKey(key);
     
-    public T Get(int id) => _rows[_index[id]];
+    public T Get(int id) => _rows[_index[id]].data;
 
-    public void Delete(T row)
+    public void Delete(T data)
     {
-        OnDelete?.Invoke(row);
-        CheckConstraintsForItem(TriggerType.OnDelete, row);
-        _deletedRows.Add(row);
+        CheckConstraintsForItem(TriggerType.OnDelete, data);
+        OnDelete?.Invoke(data);
+        var pk = _primaryKeyGetterFn(data);
+        _deletedRows.TryAdd(pk, data);
+        InternalDelete(pk);
     }
 
-    public T Add(T item)
+    public T Add(T data)
     {
         if (OnInsert != null)
-            item = OnInsert(item);
-        CheckConstraintsForItem(TriggerType.OnCreate, item);
-        CheckConstraintsForItem(TriggerType.OnUpdate, item);
-        _newRows.Add(item);
-        return item;
+            data = OnInsert(data);
+        CheckConstraintsForItem(TriggerType.OnCreate, data);
+        CheckConstraintsForItem(TriggerType.OnUpdate, data);
+        var pk = InternalAdd(data);
+        _newRows.Add(pk);
+        return data;
+    }
+
+    private int InternalAdd(T data)
+    {
+        var index = _rows.Count;
+        var pk = _primaryKeyGetterFn(data);
+        _rows.Add(new Row<T>() {data = data, committed = false});
+        _index.Add(pk, index);
+        return pk;
     }
 
     public int Delete(PredicateDelegate<T> predicateFn) => Apply(Delete, predicateFn);
@@ -74,38 +110,41 @@ public class Table<T>
     {
         for (var i = 0; i < _newRows.Count; i++)
         {
-            var item = _newRows[i];
-            var index = _rows.Count;
-            _rows.Add(item);
-            _index.Add(_primaryKeyGetterFn(item), index);
+            var pk = _newRows[i];
+            var index = _index[pk];
+            var row = _rows[index];
+            row.committed = true;
+            _rows[index] = row;
         }
         _newRows.Clear();
-        
-        for (var i = 0; i < _modifiedRows.Count; i++)
+
+        foreach (var pk in _modifiedRows.Keys)
         {
-            var item = _modifiedRows[i];
-            var index = _index[_primaryKeyGetterFn(item)];
-            _rows[index] = item;
+            var index = _index[pk];
+            var row = _rows[index];
+            row.committed = true;
+            _rows[index] = row;
         }
         _modifiedRows.Clear();
         
-        for (var i = 0; i < _deletedRows.Count; i++)
-        {
-            InternalDelete(_primaryKeyGetterFn(_deletedRows[i]));
-        }
+        //Nothing needs to be done, they're gone already.
         _deletedRows.Clear();
     }
 
 
-    public T Update(T item)
+    public T Update(T data)
     {
-        var index = _primaryKeyGetterFn(item);
+        var pk = _primaryKeyGetterFn(data);
+        var index = _index[pk];
         var currentRow = _rows[index];
+        var oldData = currentRow.data;
         if (OnUpdate != null)
-            item = OnUpdate(currentRow, item);
-        CheckConstraintsForItem(TriggerType.OnUpdate, item);
-        _modifiedRows.Add(item);
-        return item;
+            data = OnUpdate(oldData, data);
+        CheckConstraintsForItem(TriggerType.OnUpdate, data);
+        currentRow.data = data;
+        currentRow.committed = false;
+        _modifiedRows.TryAdd(pk, oldData);
+        return data;
     }
     
 
@@ -114,30 +153,36 @@ public class Table<T>
         var modifiedCount = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
-            var item = _rows[i];
-            if (predicateFn(item))
+            var row = _rows[i];
+            if (predicateFn(row.data))
             {
-                var newItem = modifyFn(item);
-                if (OnUpdate != null)
-                    newItem = OnUpdate(item, newItem);
-                CheckConstraintsForItem(TriggerType.OnUpdate, newItem);
-                _modifiedRows.Add(newItem);
+                Update(modifyFn(row.data));
             }
         }
         return modifiedCount;
     }
 
-    public int Apply(Action<T> applyFn, PredicateDelegate<T> predicateFn)
+    public int Apply(RowAction<T> applyFn, PredicateDelegate<T> predicateFn)
     {
         var count = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
-            var item = _rows[i];
-            if (!predicateFn(item)) continue;
-            applyFn(item);
+            var row = _rows[i];
+            if (!predicateFn(row.data)) continue;
+            applyFn(row.data);
             count++;
         }
         return count;
+    }
+    
+    public IEnumerable<T> Select(PredicateDelegate<T> predicateFn)
+    {
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            var row = _rows[i];
+            if (!predicateFn(row.data)) continue;
+            yield return row.data;
+        }
     }
 
 
@@ -145,8 +190,8 @@ public class Table<T>
     {
         for (var i = 0; i < _rows.Count; i++)
         {
-            var item = _rows[i];
-            if (predicateFn(item)) return true;
+            var row = _rows[i];
+            if (predicateFn(row.data)) return true;
         }
         return false;
     }
@@ -157,10 +202,9 @@ public class Table<T>
         var count = 0;
         for (var i = 0; i < _rows.Count; i++)
         {
-            var item = _rows[i];
-            if (predicateFn(item)) count++;
+            var row = _rows[i];
+            if (predicateFn(row.data)) count++;
         }
-
         return count;
     }
 
@@ -168,8 +212,8 @@ public class Table<T>
     {
         for (var i = 0; i < _rows.Count; i++)
         {
-            var item = _rows[i];
-            applyFn(item);
+            var row = _rows[i];
+            applyFn(row.data);
         }
     }
 
@@ -177,13 +221,34 @@ public class Table<T>
     {
         for (var i = 0; i < _rows.Count; i++)
         {
-            var oldItem = _rows[i];
-            var newItem = modifyFn(oldItem);
-            if (OnUpdate != null)
-                newItem = OnUpdate(oldItem, newItem);
-            CheckConstraintsForItem(TriggerType.OnUpdate, newItem);
-            _modifiedRows.Add(newItem);
+            var row = _rows[i];
+            Update(modifyFn(row.data));
         }
+    }
+
+    public void Rollback()
+    {
+        for (var i = 0; i < _newRows.Count; i++)
+        {
+            var pk = _newRows[i];
+            InternalDelete(pk);
+        }
+        _newRows.Clear();
+
+        foreach (var (pk, oldData) in _modifiedRows)
+        {
+            var index = _index[pk];
+            var row = _rows[index];
+            row.data = oldData;
+            _rows[index] = row;
+        }
+        _modifiedRows.Clear();
+        
+        foreach (var (pk, oldData) in _deletedRows)
+        {
+            InternalAdd(oldData);
+        }
+        _deletedRows.Clear();
     }
 
     public void AddConstraint(TriggerType triggerType, string constraintName, ConstraintDelegate<T> constraintFn)
@@ -193,7 +258,13 @@ public class Table<T>
 
     public void AddRelationshipConstraint<TR>(string constraintName, ForeignKeyGetterDelegate<T> foreignKeyFn, Table<TR> otherTable)
     {
-        AddConstraint(TriggerType.OnUpdate, constraintName, row => otherTable.ContainsKey(foreignKeyFn(row)));
+        AddConstraint(TriggerType.OnUpdate, constraintName, row =>
+        {
+            var fk = foreignKeyFn(row);
+            if (!fk.HasValue) return true;
+            return otherTable.ContainsKey(fk.Value);
+        });
+        
         otherTable.AddConstraint(TriggerType.OnDelete, constraintName, otherRow =>
         {
             var fk = otherTable._primaryKeyGetterFn(otherRow);
@@ -218,9 +289,8 @@ public class Table<T>
         var lastIndex = _rows.Count - 1;
         var lastRow = _rows[lastIndex];
         _rows[index] = lastRow;
-        _index[_primaryKeyGetterFn(lastRow)] = index;
+        _index[_primaryKeyGetterFn(lastRow.data)] = index;
         _index.Remove(id);
         _rows.RemoveAt(lastIndex);
-        OnDelete?.Invoke(deletedRow);
     }
 }
