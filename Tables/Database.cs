@@ -1,10 +1,11 @@
 namespace Tables;
 
-public struct Transaction
-{
-    private ITable[] tables;
 
-    public Transaction(params ITable[] tables)
+public class Database
+{
+    internal ITable[] tables;
+
+    public Database(params ITable[] tables)
     {
         this.tables = tables;
     }

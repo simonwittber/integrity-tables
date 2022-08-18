@@ -1,17 +1,5 @@
 ﻿namespace Tables;
 
-
-public delegate bool ConstraintDelegate<T>(T item);
-public delegate bool PredicateDelegate<T>(T item);
-public delegate T ModifyDelegate<T>(T item);
-
-public delegate void RowAction<in T>(T item);
-public delegate T OnInsertDelegate<T>(T item);
-public delegate T OnUpdateDelegate<T>(T oldItem, T newItem);
-public delegate int PrimaryKeyGetterDelegate<T>(T item);
-public delegate void OnDeleteDelegate<T>(T item);
-public delegate int? ForeignKeyGetterDelegate<T>(T item);
-
 public class Table<T> : ITable
 {
     public OnDeleteDelegate<T> OnDelete = null;
@@ -75,8 +63,8 @@ public class Table<T> : ITable
 
     public void Delete(T data)
     {
-        CheckConstraintsForItem(TriggerType.OnDelete, data);
         OnDelete?.Invoke(data);
+        CheckConstraintsForItem(TriggerType.OnDelete, data);
         var pk = _primaryKeyGetterFn(data);
         _deletedRows.TryAdd(pk, data);
         InternalDelete(pk);
@@ -102,7 +90,7 @@ public class Table<T> : ITable
         return pk;
     }
 
-    public int Delete(PredicateDelegate<T> predicateFn) => Apply(Delete, predicateFn);
+    public int Delete(Predicate<T> predicateFn) => Apply(Delete, predicateFn);
 
     public void Delete(int id) => Delete(Get(id));
 
@@ -130,25 +118,26 @@ public class Table<T> : ITable
         //Nothing needs to be done, they're gone already.
         _deletedRows.Clear();
     }
-
-
-    public T Update(T data)
+    
+    public T Update(T newData)
     {
-        var pk = _primaryKeyGetterFn(data);
+        var pk = _primaryKeyGetterFn(newData);
         var index = _index[pk];
         var currentRow = _rows[index];
         var oldData = currentRow.data;
         if (OnUpdate != null)
-            data = OnUpdate(oldData, data);
-        CheckConstraintsForItem(TriggerType.OnUpdate, data);
-        currentRow.data = data;
+            newData = OnUpdate(oldData, newData);
+        CheckConstraintsForItem(TriggerType.OnUpdate, newData);
+        currentRow.data = newData;
         currentRow.committed = false;
+        _rows[index] = currentRow;
+        //Try and add the old data in case of rollback. Consecutive updates will be ignored.
         _modifiedRows.TryAdd(pk, oldData);
-        return data;
+        return newData;
     }
     
 
-    public int Update(ModifyDelegate<T> modifyFn, PredicateDelegate<T> predicateFn)
+    public int Update(ModifyDelegate<T> modifyFn, Predicate<T> predicateFn)
     {
         var modifiedCount = 0;
         for (var i = 0; i < _rows.Count; i++)
@@ -162,7 +151,7 @@ public class Table<T> : ITable
         return modifiedCount;
     }
 
-    public int Apply(RowAction<T> applyFn, PredicateDelegate<T> predicateFn)
+    public int Apply(RowAction<T> applyFn, Predicate<T> predicateFn)
     {
         var count = 0;
         for (var i = 0; i < _rows.Count; i++)
@@ -175,7 +164,7 @@ public class Table<T> : ITable
         return count;
     }
     
-    public IEnumerable<T> Select(PredicateDelegate<T> predicateFn)
+    public IEnumerable<T> Select(Predicate<T> predicateFn)
     {
         for (var i = 0; i < _rows.Count; i++)
         {
@@ -186,7 +175,7 @@ public class Table<T> : ITable
     }
 
 
-    public bool IsTrue(PredicateDelegate<T> predicateFn)
+    public bool IsTrue(Predicate<T> predicateFn)
     {
         for (var i = 0; i < _rows.Count; i++)
         {
@@ -197,7 +186,7 @@ public class Table<T> : ITable
     }
 
     
-    public int Count(PredicateDelegate<T> predicateFn)
+    public int Count(Predicate<T> predicateFn)
     {
         var count = 0;
         for (var i = 0; i < _rows.Count; i++)
@@ -256,19 +245,28 @@ public class Table<T> : ITable
         _constraints.Add((triggerType, constraintName, constraintFn));
     }
 
-    public void AddRelationshipConstraint<TR>(string constraintName, ForeignKeyGetterDelegate<T> foreignKeyFn, Table<TR> otherTable)
+    public void AddRelationshipConstraint<TR>(string constraintName, ForeignKeyGetterDelegate<T> getForeignKeyFn, Table<TR> otherTable, bool cascadeDelete = false)
     {
         AddConstraint(TriggerType.OnUpdate, constraintName, row =>
         {
-            var fk = foreignKeyFn(row);
+            var fk = getForeignKeyFn(row);
             if (!fk.HasValue) return true;
             return otherTable.ContainsKey(fk.Value);
         });
-        
+
+        if (cascadeDelete)
+        {
+            otherTable.OnDelete += item =>
+            {
+                var fk = otherTable._primaryKeyGetterFn(item);
+                Delete(i => getForeignKeyFn(i) == fk);
+            };
+        }
+
         otherTable.AddConstraint(TriggerType.OnDelete, constraintName, otherRow =>
         {
             var fk = otherTable._primaryKeyGetterFn(otherRow);
-            return !IsTrue(row => foreignKeyFn(row) == fk);
+            return !IsTrue(row => getForeignKeyFn(row) == fk);
         });
     }
 
