@@ -12,13 +12,15 @@ public class Table<T> : ITable
     private readonly Dictionary<int, T> _modifiedRows = new();
     private readonly Dictionary<int, int> _index = new();
     private readonly PrimaryKeyGetterDelegate<T> _primaryKeyGetterFn;
+    private readonly PrimaryKeySetterDelegate<T> _primaryKeySetterFn;
     private readonly List<Row<T>> _rows = new();
 
     public int RowCount => _rows.Count;
-    
-    public Table(PrimaryKeyGetterDelegate<T> primaryKeyGetterFn)
+
+    public Table(PrimaryKeyGetterDelegate<T> primaryKeyGetterFn, PrimaryKeySetterDelegate<T> primaryKeySetterFn=null)
     {
         _primaryKeyGetterFn = primaryKeyGetterFn;
+        _primaryKeySetterFn = primaryKeySetterFn;
     }
 
     public T this[int id]
@@ -72,6 +74,8 @@ public class Table<T> : ITable
 
     public T Add(T data)
     {
+        if (_primaryKeySetterFn != null)
+            data = _primaryKeySetterFn(data);
         if (OnInsert != null)
             data = OnInsert(data);
         CheckConstraintsForItem(TriggerType.OnCreate, data);
@@ -172,6 +176,22 @@ public class Table<T> : ITable
             if (!predicateFn(row.data)) continue;
             yield return row.data;
         }
+    }
+    
+    public bool TryGet(Predicate<T> predicateFn, out T data)
+    {
+        var count = 0;
+        data = default;
+        for (var i = 0; i < _rows.Count; i++)
+        {
+            var row = _rows[i];
+            if (predicateFn(row.data))
+            {
+                data = row.data;
+                count++;
+            }
+        }
+        return count == 1;
     }
 
 

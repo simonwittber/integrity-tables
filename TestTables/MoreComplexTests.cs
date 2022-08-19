@@ -112,15 +112,12 @@ public class MoreComplexTests
         {
             if (oldItem.version.HasValue)
             {
-                Console.WriteLine($"Has Value {oldItem.name} {oldItem.version}");
                 newItem.version = oldItem.version + 1;
             }
             else
             {
-                Console.WriteLine($"No Value {oldItem.name} {oldItem.version}");
                 newItem.version = 1;
             }
-            Console.WriteLine($"{oldItem.version} = {newItem.version}");
             return newItem;
         };
         db.Begin();
