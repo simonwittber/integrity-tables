@@ -66,7 +66,8 @@ namespace Tables
                 for (int i = 0, len = _rows.Count; i < len; i++)
                 {
                     var row = _rows[i];
-                    if (!row.committed) return true;
+                    if (row.committed && !row.deleted) continue;
+                    return true;
                 }
                 return false;
             }

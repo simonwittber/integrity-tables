@@ -32,6 +32,7 @@ public class RelationalDataTests
     private Table<Department> dept;
     private Database db;
 
+    
     [SetUp]
     public void Setup()
     {
@@ -68,13 +69,22 @@ public class RelationalDataTests
         Assert.AreEqual(0, e1.id);
         Assert.AreEqual(1, e2.id);
         Assert.AreEqual(2, e3.id);
-
         Assert.IsTrue(emp.TryGet(i => i.manager_id == e1.id, out var result));
         Assert.AreEqual("Simon", result.name);
         Assert.AreEqual(2, emp.Count(i=>i.salary<2000));
-        
+        Assert.IsTrue(emp.IsDirty);
+        db.Commit();
+        Assert.IsFalse(emp.IsDirty);
         var deletedCount = emp.Delete(i => i.salary < 2000);
+        Assert.IsTrue(emp.IsDirty);
         Assert.AreEqual(2, deletedCount);
+        Assert.Throws<IndexOutOfRangeException>(() =>
+        {
+            emp.Get(0);
+        });
+        var r = emp.Get(1);
+        Assert.AreEqual(1, r.id);
+        Assert.IsTrue(emp.IsDirty);
         emp.Apply(i => Console.WriteLine(i));
         Assert.AreEqual(0, emp.Count(i=>i.salary<2000));
         db.Commit();
