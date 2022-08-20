@@ -1,7 +1,10 @@
-namespace Tables;
-
-internal struct Row<T>
+namespace Tables
 {
-    public bool committed;
-    public T data;
+
+    internal struct Row<T>
+    {
+        public bool committed;
+        public bool deleted;
+        public T data;
+    }
 }

@@ -1,8 +1,10 @@
-namespace Tables;
-
-public enum TriggerType
+namespace Tables
 {
-    OnCreate,
-    OnUpdate,
-    OnDelete
+
+    public enum TriggerType
+    {
+        OnCreate,
+        OnUpdate,
+        OnDelete
+    }
 }

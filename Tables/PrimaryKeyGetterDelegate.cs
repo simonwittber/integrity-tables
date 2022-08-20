@@ -1,4 +1,7 @@
-namespace Tables;
+namespace Tables
+{
 
-public delegate int PrimaryKeyGetterDelegate<T>(T item);
-public delegate T PrimaryKeySetterDelegate<T>(T item);
+    public delegate int PrimaryKeyGetterDelegate<T>(T item);
+
+    public delegate T PrimaryKeySetterDelegate<T>(T item);
+}

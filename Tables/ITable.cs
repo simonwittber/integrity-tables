@@ -1,10 +1,12 @@
-﻿namespace Tables;
-
-public interface ITable
+﻿namespace Tables
 {
-    int RowCount { get; }
-    bool IsDirty { get; }
-    void Commit();
-    void Rollback();
-    void Begin();
+
+    public interface ITable
+    {
+        int RowCount { get; }
+        bool IsDirty { get; }
+        void Commit();
+        void Rollback();
+        void Begin();
+    }
 }

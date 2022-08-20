@@ -1,7 +1,9 @@
-namespace Tables;
-
-public enum CascadeOperation
+namespace Tables
 {
-    Delete,
-    None
+
+    public enum CascadeOperation
+    {
+        Delete,
+        None
+    }
 }

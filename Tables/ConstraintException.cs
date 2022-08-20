@@ -1,8 +1,12 @@
-namespace Tables;
+using System;
 
-public class ConstraintException : Exception
+namespace Tables
 {
-    public ConstraintException(string name) : base($"Constraint Exception: {name}")
+
+    public class ConstraintException : Exception
     {
+        public ConstraintException(string name) : base($"Constraint Exception: {name}")
+        {
+        }
     }
 }

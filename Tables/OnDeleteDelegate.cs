@@ -1,3 +1,5 @@
-namespace Tables;
+namespace Tables
+{
 
-public delegate void OnDeleteDelegate<T>(T item);
+    public delegate void OnDeleteDelegate<T>(T item);
+}

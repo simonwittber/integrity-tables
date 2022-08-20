@@ -1,3 +1,4 @@
-namespace Tables;
-
-public delegate int? ForeignKeyGetterDelegate<T>(T item);
+namespace Tables
+{
+    public delegate int? ForeignKeyGetterDelegate<T>(T item);
+}
