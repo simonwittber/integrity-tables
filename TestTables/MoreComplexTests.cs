@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using NUnit.Framework;
 using Tables;
+using static Tables.Database;
 
 namespace TestTables;
 
@@ -24,16 +25,34 @@ public class MoreComplexTests
 
     private Table<Employee> emp;
     private Table<Department> dept;
-    private Database db;
 
     [SetUp]
     public void Setup()
     {
-        emp = new Table<Employee>(i => i.id);
-        dept = new Table<Department>(i => i.id);
-        emp.AddRelationshipConstraint("dept_fk", i=> i.department_id, dept);
-        emp.AddRelationshipConstraint("manager_fk", i=>i.manager_id, emp);
-        db = new Database(emp, dept);
+        DropTables();        
+        emp = CreateTable<Employee>(i => i.id);
+        dept = CreateTable<Department>(i => i.id);
+        emp.AddRelationshipConstraint(
+            getForeignKeyFn: employee => employee.department_id,
+            setForeignKeyFn: (employee, fk) =>
+            {
+                employee.department_id = fk;
+                return employee;
+            }, 
+            foreignTable:dept,
+            CascadeOperation.Delete);
+
+
+        emp.AddRelationshipConstraint(
+            i => i.manager_id,
+            (i, fk) =>
+            {
+                i.manager_id = fk;
+                return i;
+            },
+            emp,
+            CascadeOperation.SetNull);
+
     }
 
     [Test]
@@ -94,13 +113,13 @@ public class MoreComplexTests
         var dept1 = dept.Add(new Department() {id = 1, name = "Sales"});
         Assert.Throws<Exception>(() =>
         {
-            db.Begin();
+            Begin();
         });
-        db.Rollback();
-        db.Begin();
+        Rollback();
+        Begin();
         dept1 = dept.Add(new Department() {id = 1, name = "Sales"});
         emp1 = emp.Add(new Employee() {id = 0, name = "Simon", department_id = 1});
-        db.Commit();
+        Commit();
         Assert.AreEqual(1, emp.RowCount);
         Assert.AreEqual(1, dept.RowCount);
     }
@@ -108,7 +127,7 @@ public class MoreComplexTests
     [Test]
     public void TriggerTest()
     {
-        emp.OnUpdate += (oldItem, newItem) =>
+        emp.BeforeUpdate += (oldItem, newItem) =>
         {
             if (oldItem.version.HasValue)
             {
@@ -120,18 +139,18 @@ public class MoreComplexTests
             }
             return newItem;
         };
-        db.Begin();
+        Begin();
         emp.Add(new Employee() {id = 32, name = "Simon"});
-        db.Commit();
+        Commit();
         var item = emp.Get(32);
         Assert.IsFalse(item.version.HasValue);
-        db.Begin();
+        Begin();
         item.name = "Boris";
         var newItem = emp.Update(item);
         Assert.IsTrue(newItem.version.HasValue);
         Assert.AreEqual(1, newItem.version.Value);
         Assert.AreEqual("Boris", newItem.name);
-        db.Commit();
+        Commit();
         newItem.name = "Vlad";
         var anotherNewItem = emp.Update(newItem);
         Assert.AreEqual("Vlad", anotherNewItem.name);

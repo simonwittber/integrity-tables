@@ -1,17 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using Tables;
+using static Tables.Database;
 
 namespace TestTables;
 
 public class RelationalDataTests
 {
-    struct Employee
+    
+    public struct Employee
     {
         public static int last_id = 0;
         public int id;
         public string name;
+        
         public int? department_id;
+        
         public int? manager_id;
         public float salary;
 
@@ -21,7 +26,7 @@ public class RelationalDataTests
         }
     }
 
-    struct Department
+    public struct Department
     {
         public int id;
         public string name;
@@ -30,42 +35,59 @@ public class RelationalDataTests
 
     private Table<Employee> emp;
     private Table<Department> dept;
-    private Database db;
 
-    
+
+
     [SetUp]
     public void Setup()
     {
-        emp = new Table<Employee>(i => i.id, i =>
+        DropTables();
+        dept = CreateTable<Department>(i => i.id);
+
+        emp = CreateTable<Employee>(i => i.id, i =>
         {
             i.id = Employee.last_id++;
             return i;
         });
-        dept = new Table<Department>(i => i.id);
-        emp.AddRelationshipConstraint("dept_fk", i=> i.department_id, dept);
-        emp.AddRelationshipConstraint("manager_fk", i=>i.manager_id, emp);
-        
-        db = new Database(emp, dept);
 
-        
+
+        emp.AddRelationshipConstraint(
+            i => i.manager_id,
+            (i, fk) =>
+            {
+                i.manager_id = fk;
+                return i;
+            },
+            emp,
+            CascadeOperation.SetNull);
+        emp.AddRelationshipConstraint(
+            e => e.department_id,
+            (e, fk) =>
+            {
+                e.department_id = fk;
+                return e;
+            },
+            dept,
+            CascadeOperation.Delete);
+
     }
+
+    
 
     [Test]
     public void TestPKFn()
     {
-        db.Begin();
-        
+        Begin();
         var e1 = emp.Add(new() {name = "Boris", salary = 1000});
         var e2 = emp.Add(new() {name = "Vlad", salary = 2000});
         var e3 = emp.Add(new() {name = "Simon", salary = 1000, manager_id = e1.id});
-        emp.OnDelete += item =>
+        Assert.Throws<ConstraintException>(() =>
         {
-            emp.Update(i =>
-            {
-                i.manager_id = null;
-                return i;
-            }, employee => employee.manager_id==item.id);
-        };
+            var e4 = emp.Add(new() {name = "Slobodan", salary = 1000, manager_id = e1.id, department_id = 322});
+        });
+        
+        
+        
         Assert.AreEqual(0, e1.id);
         Assert.AreEqual(1, e2.id);
         Assert.AreEqual(2, e3.id);
@@ -73,12 +95,12 @@ public class RelationalDataTests
         Assert.AreEqual("Simon", result.name);
         Assert.AreEqual(2, emp.Count(i=>i.salary<2000));
         Assert.IsTrue(emp.IsDirty);
-        db.Commit();
+        Commit();
         Assert.IsFalse(emp.IsDirty);
         var deletedCount = emp.Delete(i => i.salary < 2000);
         Assert.IsTrue(emp.IsDirty);
         Assert.AreEqual(2, deletedCount);
-        Assert.Throws<IndexOutOfRangeException>(() =>
+        Assert.Throws<KeyNotFoundException>(() =>
         {
             emp.Get(0);
         });
@@ -87,7 +109,7 @@ public class RelationalDataTests
         Assert.IsTrue(emp.IsDirty);
         emp.Apply(i => Console.WriteLine(i));
         Assert.AreEqual(0, emp.Count(i=>i.salary<2000));
-        db.Commit();
+        Commit();
         Assert.AreEqual(0, emp.Count(i=>i.salary<2000));
         
     }

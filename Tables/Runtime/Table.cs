@@ -1,15 +1,19 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
+using System.Reflection;
 
 namespace Tables
 {
-
-    public class Table<T> : ITable
+    public class Table<T> : ITable, IEnumerable<T> where T:struct
     {
-        public OnDeleteDelegate<T> OnDelete = null;
-        public OnInsertDelegate<T> OnInsert = null;
-        public OnUpdateDelegate<T> OnUpdate = null;
+        public BeforeDeleteDelegate<T> BeforeDelete = null;
+        public AfterDeleteDelegate<T> AfterDelete = null;
+        public BeforeAddDelegate<T> BeforeAdd = null;
+        public AfterAddDelegate<T> AfterAdd = null;
+        public BeforeUpdateDelegate<T> BeforeUpdate = null;
+        public AfterUpdateDelegate<T> AfterUpdate = null;
 
         private readonly List<(TriggerType, string, ConstraintDelegate<T>)> _constraints = new();
         private readonly Dictionary<int, T> _deletedRows = new();
@@ -20,10 +24,27 @@ namespace Tables
         private readonly PrimaryKeySetterDelegate<T> _primaryKeySetterFn;
         private readonly List<Row<T>> _rows = new();
 
-        public int RowCount => _rows.Count;
+        internal System.Action<int> InternalBeforeDelete = null;
 
-        public Table(PrimaryKeyGetterDelegate<T> primaryKeyGetterFn, PrimaryKeySetterDelegate<T> primaryKeySetterFn = null)
+        public int RowCount
         {
+            get
+            {
+                var count = 0;
+                for(var i=0; i<_rows.Count; i++)
+                    if (!_rows[i].deleted)
+                        count++;
+                return count;
+            }
+        }
+
+        public readonly string name;
+
+        public string Name => name;
+
+        internal Table(PrimaryKeyGetterDelegate<T> primaryKeyGetterFn, PrimaryKeySetterDelegate<T> primaryKeySetterFn = null)
+        {
+            this.name = typeof(T).Name;
             _primaryKeyGetterFn = primaryKeyGetterFn;
             _primaryKeySetterFn = primaryKeySetterFn;
         }
@@ -35,11 +56,13 @@ namespace Tables
             {
                 var newData = value;
                 var row = GetRow(_index[id]);
-                if (OnUpdate != null)
-                    newData = OnUpdate.Invoke(row.data, newData);
+                if (BeforeUpdate != null)
+                    newData = BeforeUpdate.Invoke(row.data, newData);
                 CheckConstraintsForItem(TriggerType.OnUpdate, newData);
                 row.data = newData;
                 SetRow(_index[id], row);
+                if (AfterUpdate != null)
+                    AfterUpdate(newData);
             }
         }
 
@@ -47,7 +70,7 @@ namespace Tables
         {
             var row = _rows[index];
             if (row.deleted)
-                throw new IndexOutOfRangeException("Item was deleted.");
+                throw new KeyNotFoundException("Item was deleted.");
             return row;
         }
         
@@ -55,7 +78,7 @@ namespace Tables
         {
             var r = _rows[index];
             if (r.deleted)
-                throw new IndexOutOfRangeException("Item was deleted.");
+                throw new KeyNotFoundException("Item was deleted.");
             _rows[index] = row;
         }
 
@@ -87,7 +110,7 @@ namespace Tables
 
         public void Delete(T data)
         {
-            OnDelete?.Invoke(data);
+            BeforeDelete?.Invoke(data);
             CheckConstraintsForItem(TriggerType.OnDelete, data);
             var pk = _primaryKeyGetterFn(data);
             var index = _index[pk];
@@ -95,18 +118,21 @@ namespace Tables
             var row = _rows[index];
             row.deleted = true;
             _rows[index] = row;
+            AfterDelete?.Invoke(data);
         }
 
         public T Add(T data)
         {
             if (_primaryKeySetterFn != null)
                 data = _primaryKeySetterFn(data);
-            if (OnInsert != null)
-                data = OnInsert(data);
+            if (BeforeAdd != null)
+                data = BeforeAdd(data);
             CheckConstraintsForItem(TriggerType.OnCreate, data);
             CheckConstraintsForItem(TriggerType.OnUpdate, data);
             var pk = InternalAdd(data);
             _newRows.Add(pk);
+            if (AfterAdd != null)
+                AfterAdd(data);
             return data;
         }
 
@@ -114,8 +140,8 @@ namespace Tables
         {
             var index = _rows.Count;
             var pk = _primaryKeyGetterFn(data);
-            _rows.Add(new Row<T>() {data = data, committed = false, deleted = false});
             _index.Add(pk, index);
+            _rows.Add(new Row<T>() {data = data, committed = false, deleted = false});
             return pk;
         }
 
@@ -165,14 +191,16 @@ namespace Tables
             var index = _index[pk];
             var currentRow = GetRow(index);
             var oldData = currentRow.data;
-            if (OnUpdate != null)
-                newData = OnUpdate(oldData, newData);
+            if (BeforeUpdate != null)
+                newData = BeforeUpdate(oldData, newData);
             CheckConstraintsForItem(TriggerType.OnUpdate, newData);
             currentRow.data = newData;
             currentRow.committed = false;
             SetRow(index, currentRow);
             //Try and add the old data in case of rollback. Consecutive updates will be ignored.
             _modifiedRows.TryAdd(pk, oldData);
+            if (AfterUpdate != null)
+                AfterUpdate(newData);
             return newData;
         }
 
@@ -323,27 +351,41 @@ namespace Tables
             _constraints.Add((triggerType, constraintName, constraintFn));
         }
 
-        public void AddRelationshipConstraint<TR>(string constraintName, ForeignKeyGetterDelegate<T> getForeignKeyFn, Table<TR> otherTable, bool cascadeDelete = false)
+        public void AddRelationshipConstraint<TR>(ForeignKeyGetterDelegate<T> getForeignKeyFn, ForeignKeySetterDelegate<T> setForeignKeyFn, Table<TR> foreignTable, CascadeOperation cascadeOperation) where TR:struct
         {
+            var constraintName = $"{typeof(TR).Name}_fk";
             AddConstraint(TriggerType.OnUpdate, constraintName, row =>
             {
                 var fk = getForeignKeyFn(row);
                 if (!fk.HasValue) return true;
-                return otherTable.ContainsKey(fk.Value);
+                return foreignTable.ContainsKey(fk.Value);
             });
 
-            if (cascadeDelete)
+            switch(cascadeOperation)
             {
-                otherTable.OnDelete += item =>
-                {
-                    var fk = otherTable._primaryKeyGetterFn(item);
-                    Delete(i => getForeignKeyFn(i) == fk);
-                };
+                case CascadeOperation.Delete:
+                    foreignTable.BeforeDelete += item =>
+                    {
+                        var fk = foreignTable._primaryKeyGetterFn(item);
+                        Delete(i => getForeignKeyFn(i) == fk);
+                    };
+                    break;
+                case CascadeOperation.SetNull:
+                    foreignTable.BeforeDelete += item =>
+                    {
+                        var fk = foreignTable._primaryKeyGetterFn(item);
+                        Update(i => setForeignKeyFn(i, null), i => getForeignKeyFn(i) == fk);
+                    };
+                    break;
+                case CascadeOperation.None:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(cascadeOperation), cascadeOperation, null);
             }
 
-            otherTable.AddConstraint(TriggerType.OnDelete, constraintName, otherRow =>
+            foreignTable.AddConstraint(TriggerType.OnDelete, constraintName, otherRow =>
             {
-                var fk = otherTable._primaryKeyGetterFn(otherRow);
+                var fk = foreignTable._primaryKeyGetterFn(otherRow);
                 return !IsTrue(row => getForeignKeyFn(row) == fk);
             });
         }
@@ -356,6 +398,20 @@ namespace Tables
                 if (type == triggerType && !constraintFn.Invoke(item))
                     throw new ConstraintException(constraintName);
             }
+        }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            for (var i = 0; i < _rows.Count; i++)
+            {
+                var row = _rows[i];
+                if (!row.deleted) yield return row.data;
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
         }
     }
 }

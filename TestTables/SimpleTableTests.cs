@@ -1,120 +1,35 @@
+using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
 using NUnit.Framework;
 using Tables;
+using static Tables.Database;
 
 namespace TestTables;
 
+public struct TestRow
+{
+    public int id;
+    public string name;
+
+}
+
+
 public class SimpleTableTests
 {
-    public struct TestRow
-    {
-        public int id;
-        public string name;
-    }
-    
-    [SetUp]
-    public void Setup()
-    {
-    }
-
     [Test]
     public void TestInsertAndGet()
     {
-        var table = new Table<TestRow>(i=>i.id);
+        var table = CreateTable<TestRow>(i=>i.id);
         table.AddConstraint(TriggerType.OnUpdate,"Name Not Null", i => i.name != null);
         var row = table.Add(new TestRow() { id=23, name = "srw" });
         table.Commit();
-        Assert.AreEqual(23, row.id);
+        Assert.AreEqual(23, (int)row.id);
         var anotherRow = table.Get(23);
         Assert.AreEqual("srw", anotherRow.name);
-    }
-    
-    [Test]
-    public void TestInsertTrigger()
-    {
-        var table = new Table<TestRow>(i=>i.id);
-        table.OnInsert = item =>
-        {
-            item.name = "haha";
-            return item;
-        };
         
-        var row = table.Add(new TestRow() { id=23, name = "srw" });
-        Assert.AreEqual("haha", row.name);
+        
     }
     
-    [Test]
-    public void TestInsertTriggerFailsConstraint()
-    {
-        var table = new Table<TestRow>(i=>i.id);
-        table.AddConstraint(TriggerType.OnUpdate,"NotNullName", row => row.name != null);
-        table.OnInsert = item =>
-        {
-            item.name = null;
-            return item;
-        };
-        Assert.Throws<ConstraintException>(() =>
-        {
-            table.Add(new TestRow() { id=23, name = "srw" });
-        });
+    
 
-    }
-    
-    [Test]
-    public void TestDelete()
-    {
-        var table = new Table<TestRow>(i=>i.id);
-        table.Add(new TestRow() { id=23, name = "srw" });
-        table.Add(new TestRow() { id=22, name = "srw" });
-        table.Commit();
-        table.Delete(23);
-        table.Commit();
-        Assert.Throws<KeyNotFoundException>(() => table.Get(23));
-    }
-    
-    [Test]
-    public void TestConstraints()
-    {
-        var table = new Table<TestRow>(i=>i.id);
-        table.AddConstraint(TriggerType.OnUpdate,"Name Not Null", i => i.name != null);
-        Assert.Throws<ConstraintException>(() =>
-        {
-            var row = table.Add(new TestRow() {id = 23, name = null});
-        });
-    }
-    
-    struct Person
-    {
-        public int id;
-        public string name;
-        public int location_id;
-    }
-
-    struct Location
-    {
-        public int id;
-        public string name;
-    }
-
-    [Test]
-    public void TestRelations()
-    {
-        var persons = new Table<Person>(item => item.id);
-        var locations = new Table<Location>(item => item.id);
-        persons.AddRelationshipConstraint("person_fk", i=>i.location_id, locations);
-        locations.Add(new Location() {id = 1, name = "Here"});
-        Assert.Throws<ConstraintException>(() =>
-        {
-            persons.Add(new Person() {id = 0, location_id = 0, name = "Simon"});
-        });
-        locations.Add(new Location() {id = 0, name = "There"});
-        locations.Commit();
-        persons.Add(new Person() {id = 0, location_id = 0, name = "Simon"});
-        persons.Commit();
-        Assert.Throws<ConstraintException>(() =>
-        {
-            locations.Delete(0);
-        });
-    }
 }
