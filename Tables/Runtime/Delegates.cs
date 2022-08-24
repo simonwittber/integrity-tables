@@ -14,5 +14,4 @@ namespace Tables
     public delegate T PrimaryKeySetterDelegate<T>(T item);
     public delegate void RowAction<in T>(T item);
 
-
 }

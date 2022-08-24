@@ -1,27 +1,29 @@
 ﻿using System;
-using System.Diagnostics;
 using NUnit.Framework;
 using Tables;
 using static Tables.Database;
+using ConstraintException = Tables.ConstraintException;
 
 namespace TestTables;
 
+public struct Employee
+{
+    public int id;
+    public string name;
+    public int? department_id;
+    public int? manager_id;
+    public int? version;
+}
+
+public struct Department
+{
+    public int id;
+    public string name;
+}
+
 public class MoreComplexTests
 {
-    struct Employee
-    {
-        public int id;
-        public string name;
-        public int? department_id;
-        public int? manager_id;
-        public int? version;
-    }
-
-    struct Department
-    {
-        public int id;
-        public string name;
-    }
+    
 
     private Table<Employee> emp;
     private Table<Department> dept;
@@ -29,29 +31,26 @@ public class MoreComplexTests
     [SetUp]
     public void Setup()
     {
-        DropTables();        
+        DropDatabase();        
         emp = CreateTable<Employee>(i => i.id);
         dept = CreateTable<Department>(i => i.id);
-        emp.AddRelationshipConstraint(
-            getForeignKeyFn: employee => employee.department_id,
-            setForeignKeyFn: (employee, fk) =>
-            {
-                employee.department_id = fk;
-                return employee;
-            }, 
-            foreignTable:dept,
-            CascadeOperation.Delete);
+        emp.AddRelationshipConstraint(nameof(Employee.department_id), dept, CascadeOperation.Delete);
+        emp.AddRelationshipConstraint(nameof(Employee.manager_id), emp, CascadeOperation.SetNull);
 
+    }
 
-        emp.AddRelationshipConstraint(
-            i => i.manager_id,
-            (i, fk) =>
-            {
-                i.manager_id = fk;
-                return i;
-            },
-            emp,
-            CascadeOperation.SetNull);
+    [Test]
+    public void SetterTest()
+    {
+        var e = new Employee() {id = 1979};
+        
+        var setter = Compiler.CreateGetSet<Employee, int>("id");
+        Assert.NotNull(setter);
+        e = setter.Set(e, 2022);
+        Assert.AreEqual(2022, e.id);
+        e.id = 1968;
+        var test = setter.Get(e);
+        Assert.AreEqual(e.id, test);
 
     }
 

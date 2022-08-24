@@ -32,4 +32,8 @@
       <None Remove="obj\**" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\GetSetCompiler\GetSetCompiler.csproj" />
+    </ItemGroup>
+
 </Project>

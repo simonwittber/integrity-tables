@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tables", "Tables\Tables.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestTables", "TestTables\TestTables.csproj", "{2FF65147-CA30-4EE7-B9E7-68F1DA18B6A1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GetSetCompiler", "GetSetCompiler\GetSetCompiler.csproj", "{DBA192B0-52F2-4B64-BE65-893694F83653}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{2FF65147-CA30-4EE7-B9E7-68F1DA18B6A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2FF65147-CA30-4EE7-B9E7-68F1DA18B6A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2FF65147-CA30-4EE7-B9E7-68F1DA18B6A1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DBA192B0-52F2-4B64-BE65-893694F83653}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DBA192B0-52F2-4B64-BE65-893694F83653}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DBA192B0-52F2-4B64-BE65-893694F83653}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DBA192B0-52F2-4B64-BE65-893694F83653}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

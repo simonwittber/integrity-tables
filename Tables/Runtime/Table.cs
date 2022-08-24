@@ -351,6 +351,12 @@ namespace Tables
             _constraints.Add((triggerType, constraintName, constraintFn));
         }
 
+        public void AddRelationshipConstraint<TR>(string fieldName, Table<TR> foreignTable, CascadeOperation cascadeOperation) where TR: struct
+        {
+            var getSet = Database.Compiler.CreateGetSet<T, int?>(fieldName);
+            AddRelationshipConstraint(getSet.Get, getSet.Set, (Table<TR>)foreignTable, cascadeOperation);
+        }
+
         public void AddRelationshipConstraint<TR>(ForeignKeyGetterDelegate<T> getForeignKeyFn, ForeignKeySetterDelegate<T> setForeignKeyFn, Table<TR> foreignTable, CascadeOperation cascadeOperation) where TR:struct
         {
             var constraintName = $"{typeof(TR).Name}_fk";

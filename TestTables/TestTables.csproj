@@ -15,6 +15,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\GetSetCompiler\GetSetCompiler.csproj" />
       <ProjectReference Include="..\Tables\Tables.csproj" />
     </ItemGroup>
 

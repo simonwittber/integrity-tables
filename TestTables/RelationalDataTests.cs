@@ -41,7 +41,7 @@ public class RelationalDataTests
     [SetUp]
     public void Setup()
     {
-        DropTables();
+        DropDatabase();
         dept = CreateTable<Department>(i => i.id);
 
         emp = CreateTable<Employee>(i => i.id, i =>
