@@ -1,7 +1,7 @@
-using System.Reflection;
-using System.Reflection.Emit;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 
 namespace GetSetGenerator
 {
@@ -13,21 +13,20 @@ namespace GetSetGenerator
     
     public class GetSetCompiler
     {
-        public string AssemblyName { get; set; } = "GetSet.Xyzzy";
+        private const string AssemblyName = "GetSet.Xyzzy";
 
         readonly ModuleBuilder _moduleBuilder;
-        readonly AssemblyBuilder _assemblyBuilder;
 
         private readonly Dictionary<(Type, Type, string), object> _cache = new Dictionary<(Type, Type, string), object>();
 
         public GetSetCompiler()
         {
             var asmName = new AssemblyName {Name = AssemblyName};
-            _assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.RunAndCollect);
-            _moduleBuilder = _assemblyBuilder.DefineDynamicModule(AssemblyName);
+            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.RunAndCollect);
+            _moduleBuilder = assemblyBuilder.DefineDynamicModule(AssemblyName);
         }
 
-        public IGetSet<TInstance, TField> CreateGetSet<TInstance, TField>(string fieldName)
+        public IGetSet<TInstance, TField> Create<TInstance, TField>(string fieldName)
         {
             var key = (typeof(TInstance), typeof(TField), fieldName);
             if (!_cache.TryGetValue(key, out object getSetInstance))
@@ -35,9 +34,9 @@ namespace GetSetGenerator
             return (IGetSet<TInstance,TField>)getSetInstance;
         }
 
-        private IGetSet<T, TField> _CreateGetSet<T,TField>(string fieldName)
+        private IGetSet<TInstance, TField> _CreateGetSet<TInstance,TField>(string fieldName)
         {
-            var fi = typeof(T).GetField(fieldName, BindingFlags.Public | BindingFlags.Instance);
+            var fi = typeof(TInstance).GetField(fieldName, BindingFlags.Public | BindingFlags.Instance);
             if (fi == null)
                 throw new Exception($"Could not find field {fieldName}");
             
@@ -45,18 +44,16 @@ namespace GetSetGenerator
             if (fi == null)
                 throw new Exception($"Could not find field {fieldName}");
 
-            var className = $"GetSet_{fi.DeclaringType!.Name}_{fi.Name}";
-
+            var className = $"GetSet_{fi.DeclaringType!.FullName}_{fi.Name}";
             
             var typeBuilder = _moduleBuilder.DefineType(className, TypeAttributes.Public);
-            
             var interfaceType = typeof(IGetSet<,>).MakeGenericType(fi.DeclaringType, fi.FieldType);
             typeBuilder.AddInterfaceImplementation(interfaceType);
-            
+
             CreateSetMethod(fi.DeclaringType, fi, typeBuilder, interfaceType);
             CreateGetMethod(fi.DeclaringType, fi, typeBuilder, interfaceType);
             
-            return (IGetSet<T,TField>)Activator.CreateInstance(typeBuilder.CreateType());
+            return (IGetSet<TInstance,TField>)Activator.CreateInstance(typeBuilder.CreateType());
         }
         
         void CreateSetMethod(Type declaringType, FieldInfo fi, TypeBuilder typeBuilder, Type interfaceType)

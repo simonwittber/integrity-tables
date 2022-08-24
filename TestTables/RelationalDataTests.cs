@@ -11,7 +11,6 @@ public class RelationalDataTests
     
     public struct Employee
     {
-        public static int last_id = 0;
         public int id;
         public string name;
         
@@ -42,13 +41,9 @@ public class RelationalDataTests
     public void Setup()
     {
         DropDatabase();
-        dept = CreateTable<Department>(i => i.id);
+        dept = CreateTable<Department>();
 
-        emp = CreateTable<Employee>(i => i.id, i =>
-        {
-            i.id = Employee.last_id++;
-            return i;
-        });
+        emp = CreateTable<Employee>();
 
 
         emp.AddRelationshipConstraint(

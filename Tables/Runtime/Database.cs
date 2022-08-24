@@ -13,13 +13,28 @@ namespace Tables
         
         public static readonly GetSetCompiler Compiler = new GetSetCompiler();
 
-        public static Table<T> CreateTable<T>(PrimaryKeyGetterDelegate<T> primaryKeyGetterFn, PrimaryKeySetterDelegate<T> primaryKeySetterFn = null) where T:struct
+        public static Table<T> CreateTable<T>(string primaryKeyFieldName="id") where T:struct
         {
-            var table = new Table<T>(primaryKeyGetterFn, primaryKeySetterFn);
+            var getSet = Compiler.Create<T, int>(primaryKeyFieldName);
+            var table = new Table<T>(getSet.Get, getSet.Set);
+            
             tables.Add(typeof(T), table);
+            InspectTable(table);
             return table;
         }
-        
+
+        private static void InspectTable<T>(Table<T> table) where T : struct
+        {
+            foreach (var fi in typeof(T).GetFields(BindingFlags.Public | BindingFlags.Instance))
+            {
+                var fka = fi.FieldType.GetCustomAttribute<ForeignKeyAttribute>();
+                if (fka != null)
+                {
+                    //table.AddRelationshipConstraint(fi.Name, GetTable(fka.relatedType), fka.cascadeOperation);
+                }
+            }
+        }
+
         public static Table<T> GetTable<T>() where T:struct => (Table<T>)tables[typeof(T)];
         public static ITable GetTable(Type rowType) => tables[rowType];
 

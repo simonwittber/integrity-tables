@@ -11,6 +11,7 @@ public struct Employee
     public int id;
     public string name;
     public int? department_id;
+    [ForeignKey(typeof(Employee), CascadeOperation.SetNull)]
     public int? manager_id;
     public int? version;
 }
@@ -32,11 +33,9 @@ public class MoreComplexTests
     public void Setup()
     {
         DropDatabase();        
-        emp = CreateTable<Employee>(i => i.id);
-        dept = CreateTable<Department>(i => i.id);
+        emp = CreateTable<Employee>("id");
+        dept = CreateTable<Department>("id");
         emp.AddRelationshipConstraint(nameof(Employee.department_id), dept, CascadeOperation.Delete);
-        emp.AddRelationshipConstraint(nameof(Employee.manager_id), emp, CascadeOperation.SetNull);
-
     }
 
     [Test]
@@ -44,7 +43,7 @@ public class MoreComplexTests
     {
         var e = new Employee() {id = 1979};
         
-        var setter = Compiler.CreateGetSet<Employee, int>("id");
+        var setter = Compiler.Create<Employee, int>("id");
         Assert.NotNull(setter);
         e = setter.Set(e, 2022);
         Assert.AreEqual(2022, e.id);
@@ -65,10 +64,7 @@ public class MoreComplexTests
         var rowCount = emp.RowCount;
         //table should now be clean
         Assert.IsFalse(emp.IsDirty);
-        Assert.Throws<ConstraintException>(() =>
-        {
-            emp.Add(new Employee() {id = 1, manager_id = 2});
-        });
+        
         //table should still be clean
         Assert.IsFalse(emp.IsDirty);
         //Table should have same row count
@@ -88,17 +84,21 @@ public class MoreComplexTests
     [Test]
     public void RollbackTest()
     {
-        emp.Add(new Employee() {id = 0});
+        var emp1 = emp.Add(new Employee() {});
         emp.Commit();
-        emp.Add(new Employee() {id = 1, manager_id = 0});
+        var emp2 = emp.Add(new Employee() {manager_id = 0});
         //table should be dirty with pending adds.
         Assert.IsTrue(emp.IsDirty);
         emp.Rollback();
         Assert.AreEqual(1, emp.RowCount);
-        emp.Add(new Employee() {id = 1, manager_id = 0});
+        var emp3 = emp.Add(new Employee() {manager_id = 0});
         emp.Commit();
         Assert.AreEqual(2, emp.RowCount);
-        emp.Delete(1);
+        foreach (var i in emp)
+        {
+            Console.WriteLine($"{i.id} - {i.manager_id}");
+        }
+        emp.Delete(emp3.id);
         Assert.AreEqual(1, emp.RowCount);
         emp.Rollback();
         Assert.AreEqual(2, emp.RowCount);
@@ -139,9 +139,9 @@ public class MoreComplexTests
             return newItem;
         };
         Begin();
-        emp.Add(new Employee() {id = 32, name = "Simon"});
+        var emp1 = emp.Add(new Employee() {id = 32, name = "Simon"});
         Commit();
-        var item = emp.Get(32);
+        var item = emp.Get(emp1.id);
         Assert.IsFalse(item.version.HasValue);
         Begin();
         item.name = "Boris";

@@ -11,7 +11,7 @@ namespace Tables
     public delegate T ForeignKeySetterDelegate<T>(T item, int? fk);
     public delegate T ModifyDelegate<T>(T item);
     public delegate int PrimaryKeyGetterDelegate<T>(T item);
-    public delegate T PrimaryKeySetterDelegate<T>(T item);
+    public delegate T PrimaryKeySetterDelegate<T>(T item, int id);
     public delegate void RowAction<in T>(T item);
 
 }

@@ -25,6 +25,7 @@ namespace Tables
         private readonly List<Row<T>> _rows = new();
 
         internal System.Action<int> InternalBeforeDelete = null;
+        private int id_count = 0;
 
         public int RowCount
         {
@@ -124,7 +125,7 @@ namespace Tables
         public T Add(T data)
         {
             if (_primaryKeySetterFn != null)
-                data = _primaryKeySetterFn(data);
+                data = _primaryKeySetterFn(data, id_count++);
             if (BeforeAdd != null)
                 data = BeforeAdd(data);
             CheckConstraintsForItem(TriggerType.OnCreate, data);
@@ -353,7 +354,7 @@ namespace Tables
 
         public void AddRelationshipConstraint<TR>(string fieldName, Table<TR> foreignTable, CascadeOperation cascadeOperation) where TR: struct
         {
-            var getSet = Database.Compiler.CreateGetSet<T, int?>(fieldName);
+            var getSet = Database.Compiler.Create<T, int?>(fieldName);
             AddRelationshipConstraint(getSet.Get, getSet.Set, (Table<TR>)foreignTable, cascadeOperation);
         }
 
