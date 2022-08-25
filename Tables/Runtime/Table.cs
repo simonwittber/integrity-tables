@@ -8,7 +8,8 @@ namespace Tables
 {
     public class Table<T> : ITable, IEnumerable<T> where T:struct
     {
-        public BeforeDeleteDelegate<T> BeforeDelete = null;
+        public BeforeDeleteDelegate BeforeDelete { get; set; } = null;
+
         public AfterDeleteDelegate<T> AfterDelete = null;
         public BeforeAddDelegate<T> BeforeAdd = null;
         public AfterAddDelegate<T> AfterAdd = null;
@@ -111,7 +112,7 @@ namespace Tables
 
         public void Delete(T data)
         {
-            BeforeDelete?.Invoke(data);
+            BeforeDelete?.Invoke(_primaryKeyGetterFn(data));
             CheckConstraintsForItem(TriggerType.OnDelete, data);
             var pk = _primaryKeyGetterFn(data);
             var index = _index[pk];
@@ -352,15 +353,15 @@ namespace Tables
             _constraints.Add((triggerType, constraintName, constraintFn));
         }
 
-        public void AddRelationshipConstraint<TR>(string fieldName, Table<TR> foreignTable, CascadeOperation cascadeOperation) where TR: struct
+        public void AddRelationshipConstraint(string fieldName, ITable foreignTable, CascadeOperation cascadeOperation)
         {
             var getSet = Database.Compiler.Create<T, int?>(fieldName);
-            AddRelationshipConstraint(getSet.Get, getSet.Set, (Table<TR>)foreignTable, cascadeOperation);
+            AddRelationshipConstraint(getSet.Get, getSet.Set, foreignTable, cascadeOperation);
         }
 
-        public void AddRelationshipConstraint<TR>(ForeignKeyGetterDelegate<T> getForeignKeyFn, ForeignKeySetterDelegate<T> setForeignKeyFn, Table<TR> foreignTable, CascadeOperation cascadeOperation) where TR:struct
+        public void AddRelationshipConstraint(ForeignKeyGetterDelegate<T> getForeignKeyFn, ForeignKeySetterDelegate<T> setForeignKeyFn, ITable foreignTable, CascadeOperation cascadeOperation) 
         {
-            var constraintName = $"{typeof(TR).Name}_fk";
+            var constraintName = $"{foreignTable.GetType().Name}_fk";
             AddConstraint(TriggerType.OnUpdate, constraintName, row =>
             {
                 var fk = getForeignKeyFn(row);
@@ -371,16 +372,14 @@ namespace Tables
             switch(cascadeOperation)
             {
                 case CascadeOperation.Delete:
-                    foreignTable.BeforeDelete += item =>
+                    foreignTable.BeforeDelete += fk =>
                     {
-                        var fk = foreignTable._primaryKeyGetterFn(item);
                         Delete(i => getForeignKeyFn(i) == fk);
                     };
                     break;
                 case CascadeOperation.SetNull:
-                    foreignTable.BeforeDelete += item =>
+                    foreignTable.BeforeDelete += fk =>
                     {
-                        var fk = foreignTable._primaryKeyGetterFn(item);
                         Update(i => setForeignKeyFn(i, null), i => getForeignKeyFn(i) == fk);
                     };
                     break;
@@ -390,11 +389,11 @@ namespace Tables
                     throw new ArgumentOutOfRangeException(nameof(cascadeOperation), cascadeOperation, null);
             }
 
-            foreignTable.AddConstraint(TriggerType.OnDelete, constraintName, otherRow =>
+            foreignTable.BeforeDelete += fk =>
             {
-                var fk = foreignTable._primaryKeyGetterFn(otherRow);
-                return !IsTrue(row => getForeignKeyFn(row) == fk);
-            });
+                if (IsTrue(row => getForeignKeyFn(row) == fk))
+                    throw new ConstraintException($"{typeof(T)}_fk");
+            };
         }
 
         private void CheckConstraintsForItem(TriggerType triggerType, T item)

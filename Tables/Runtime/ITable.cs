@@ -9,5 +9,8 @@
         void Commit();
         void Rollback();
         void Begin();
+        bool ContainsKey(int fk);
+        
+        public BeforeDeleteDelegate BeforeDelete { get; set; }
     }
 }

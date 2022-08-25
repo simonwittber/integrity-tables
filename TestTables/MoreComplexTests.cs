@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using Tables;
 using static Tables.Database;
@@ -10,10 +11,9 @@ public struct Employee
 {
     public int id;
     public string name;
-    public int? department_id;
-    [ForeignKey(typeof(Employee), CascadeOperation.SetNull)]
-    public int? manager_id;
+    [ForeignKey(typeof(Department), CascadeOperation.Delete)] public int? department_id;
     public int? version;
+    [ForeignKey(typeof(Employee), CascadeOperation.SetNull)] public int? manager_id;
 }
 
 public struct Department
@@ -32,10 +32,46 @@ public class MoreComplexTests
     [SetUp]
     public void Setup()
     {
-        DropDatabase();        
-        emp = CreateTable<Employee>("id");
+        DropDatabase();
         dept = CreateTable<Department>("id");
-        emp.AddRelationshipConstraint(nameof(Employee.department_id), dept, CascadeOperation.Delete);
+        emp = CreateTable<Employee>("id");
+        
+    }
+
+    [Test]
+    public void FKAddTest()
+    {
+        var s = emp.Add(new Employee() {name = "S"});
+        var c1 = emp.Add(new Employee() {manager_id = s.id, name = "C1"});
+        
+        Assert.Throws<ConstraintException>(() =>
+        {
+            var c2 = emp.Add(new Employee() {manager_id = 78, name = "C2"});
+        });
+    }
+    
+    [Test]
+    public void FKDeleteSetNullTest()
+    {
+        var s = emp.Add(new Employee() {name = "S"});
+        var c1 = emp.Add(new Employee() {manager_id = s.id, name = "C1"});
+        Assert.IsNotNull(c1.manager_id);
+        emp.Delete(s.id);
+        c1 = emp.Get(c1.id);
+        Assert.IsNull(c1.manager_id);
+    }
+    
+    [Test]
+    public void FKDeleteDeleteTest()
+    {
+        var d = dept.Add(new Department() {name = "D"});
+        var s = emp.Add(new Employee() {name = "S", department_id = d.id});
+        
+        dept.Delete(d.id);
+        
+        Assert.Throws<KeyNotFoundException>(() => emp.Get(s.id));
+        Commit();
+        Assert.Throws<KeyNotFoundException>(() => emp.Get(s.id));
     }
 
     [Test]

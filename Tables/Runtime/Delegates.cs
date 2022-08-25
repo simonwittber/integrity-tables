@@ -2,7 +2,7 @@ namespace Tables
 {
     public delegate T BeforeAddDelegate<T>(T item);
     public delegate void AfterAddDelegate<T>(T item);
-    public delegate void BeforeDeleteDelegate<T>(T item);
+    public delegate void BeforeDeleteDelegate(int id);
     public delegate void AfterDeleteDelegate<T>(T item);
     public delegate T BeforeUpdateDelegate<T>(T oldItem, T newItem);
     public delegate void AfterUpdateDelegate<T>(T item);

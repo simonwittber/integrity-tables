@@ -6,6 +6,14 @@ using static Tables.Database;
 
 namespace TestTables;
 
+public static class EmployeeExtensionMethods
+{
+    public static Department Deparment(this Employee e)
+    {
+        return Database.GetTable<Department>()[(int) e.department_id];
+    }
+}
+
 public class RelationalDataTests
 {
     
@@ -31,6 +39,8 @@ public class RelationalDataTests
         public string name;
         public string location;
     }
+
+    
 
     private Table<Employee> emp;
     private Table<Department> dept;
