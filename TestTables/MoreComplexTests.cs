@@ -19,7 +19,14 @@ public struct Employee
 public struct Department
 {
     public int id;
+    [ForeignKey(typeof(Location), CascadeOperation.None)]
+    public int? location_id;
     public string name;
+}
+
+public struct Location
+{
+    public int id;
 }
 
 public class MoreComplexTests
@@ -33,6 +40,7 @@ public class MoreComplexTests
     public void Setup()
     {
         DropDatabase();
+        CreateTable<Location>();
         dept = CreateTable<Department>("id");
         emp = CreateTable<Employee>("id");
         
