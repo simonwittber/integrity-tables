@@ -32,7 +32,7 @@ namespace Tables
                     var foreignKeyFieldName = fi.Name;
                     var foreignTableType = fka.relatedType;
                     var cascadeOperation = fka.cascadeOperation;
-                    table.AddRelationshipConstraint(foreignKeyFieldName, GetTable(foreignTableType), cascadeOperation);
+                    table.AddRelationshipConstraint(foreignKeyFieldName, GetTable(foreignTableType), cascadeOperation, fka.isNullable);
                     CreateExtensionMethods(table, foreignTableType, fi);
                 }
             }

@@ -22,6 +22,8 @@ public partial class Table<T>
     public void Delete(int id) => Delete(Get(id));
 
     public T Get(int id) => GetRow(_index[id]).data;
+    
+    public T Get(int? id) => GetRow(_index[id.Value]).data;
 
     public T Add(T data)
     {

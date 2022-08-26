@@ -11,15 +11,15 @@ public struct Employee
 {
     public int id;
     public string name;
-    [ForeignKey(typeof(Department), CascadeOperation.Delete)] public int? department_id;
+    [ForeignKey(typeof(Department), CascadeOperation.Delete, isNullable:true)] public int? department_id;
     public int? version;
-    [ForeignKey(typeof(Employee), CascadeOperation.SetNull)] public int? manager_id;
+    [ForeignKey(typeof(Employee), CascadeOperation.SetNull, isNullable:true)] public int? manager_id;
 }
 
 public struct Department
 {
     public int id;
-    [ForeignKey(typeof(Location), CascadeOperation.None)]
+    [ForeignKey(typeof(Location), CascadeOperation.None, isNullable:true)]
     public int? location_id;
     public string name;
 }

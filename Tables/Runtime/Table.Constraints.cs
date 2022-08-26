@@ -9,21 +9,23 @@ public partial class Table<T>
         _constraints.Add((triggerType, constraintName, constraintFn));
     }
 
-    public void AddRelationshipConstraint(string fieldName, ITable foreignTable, CascadeOperation cascadeOperation)
+    public void AddRelationshipConstraint(string fieldName, ITable foreignTable, CascadeOperation cascadeOperation, bool isNullable)
     {
         var fi = typeof(T).GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
         if (fi.FieldType != typeof(int?))
             throw new Exception("Foreign key fields must be of type 'int?'");
         var getSet = Database.Compiler.Create<T, int?>(fieldName);
-        AddRelationshipConstraint(getSet.Get, getSet.Set, foreignTable, cascadeOperation);
+        AddRelationshipConstraint(getSet.Get, getSet.Set, foreignTable, cascadeOperation, isNullable);
     }
 
-    public void AddRelationshipConstraint(ForeignKeyGetterDelegate<T> getForeignKeyFn, ForeignKeySetterDelegate<T> setForeignKeyFn, ITable foreignTable, CascadeOperation cascadeOperation)
+    public void AddRelationshipConstraint(ForeignKeyGetterDelegate<T> getForeignKeyFn, ForeignKeySetterDelegate<T> setForeignKeyFn, ITable foreignTable, CascadeOperation cascadeOperation, bool isNullable)
     {
-        var constraintName = $"{foreignTable.GetType().Name}_fk";
+        var constraintName = $"fk:{typeof(T).Name}=>{foreignTable.Name}";
         AddConstraint(TriggerType.OnUpdate, constraintName, row =>
         {
             var fk = getForeignKeyFn(row);
+            if (!isNullable && !fk.HasValue)
+                return false;
             if (!fk.HasValue) return true;
             return foreignTable.ContainsKey(fk.Value);
         });

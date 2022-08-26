@@ -64,7 +64,7 @@ public class RelationalDataTests
                 return i;
             },
             emp,
-            CascadeOperation.SetNull);
+            CascadeOperation.SetNull, isNullable:true);
         emp.AddRelationshipConstraint(
             e => e.department_id,
             (e, fk) =>
@@ -73,7 +73,7 @@ public class RelationalDataTests
                 return e;
             },
             dept,
-            CascadeOperation.Delete);
+            CascadeOperation.Delete, isNullable:true);
 
     }
 
