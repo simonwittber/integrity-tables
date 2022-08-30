@@ -21,23 +21,23 @@ namespace GetSetGenerator
             _moduleBuilder = assemblyBuilder.DefineDynamicModule(AssemblyName);
         }
 
-        public IFieldIndexer<TInstance> Create<TInstance>()where TInstance:struct
+        public IFieldIndexer Create<TInstance>()where TInstance:struct
         {
             var key = typeof(TInstance);
             if (!_cache.TryGetValue(key, out object indexerInstance))
                 indexerInstance = _cache[key] = _CreateFieldIndexer<TInstance>();
-            return (IFieldIndexer<TInstance>)indexerInstance;
+            return (IFieldIndexer)indexerInstance;
         }
 
-        private IFieldIndexer<TInstance> _CreateFieldIndexer<TInstance>()where TInstance:struct
+        private IFieldIndexer _CreateFieldIndexer<TInstance>()where TInstance:struct
         {
             var fields = typeof(TInstance).GetFields(BindingFlags.Public | BindingFlags.Instance);
             
             
-            var className = $"FieldIndex";
+            var className = $"FieldIndexer_{typeof(TInstance).Namespace}_{typeof(TInstance).Name}_{typeof(TInstance).GUID}";
             var typeBuilder = _moduleBuilder.DefineType(className, TypeAttributes.Public);
             
-            var interfaceType = typeof(IFieldIndexer<>).MakeGenericType(typeof(TInstance));
+            var interfaceType = typeof(IFieldIndexer);
             typeBuilder.AddInterfaceImplementation(interfaceType);
 
 
@@ -45,7 +45,7 @@ namespace GetSetGenerator
             CreateTypesMethod<TInstance>(typeBuilder, fields, interfaceType);
             CreateNamesMethod<TInstance>(typeBuilder, fields, interfaceType);
 
-            return (IFieldIndexer<TInstance>)Activator.CreateInstance(typeBuilder.CreateType());
+            return (IFieldIndexer)Activator.CreateInstance(typeBuilder.CreateType());
 
         }
 
@@ -55,18 +55,25 @@ namespace GetSetGenerator
                 "Get",
                 MethodAttributes.Public | MethodAttributes.Virtual, CallingConventions.Standard,
                 typeof(object),
-                new[] {typeof(TInstance), typeof(int)});
+                new[] {typeof(object), typeof(int)});
 
             var il = mb.GetILGenerator();
             var defaultLabel = il.DefineLabel();
             var jumpTable = (from i in fields select il.DefineLabel()).ToArray();
+            
+            il.DeclareLocal(typeof(TInstance));
+            
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Unbox_Any, typeof(TInstance));
+            il.Emit(OpCodes.Stloc_0);
+            
             il.Emit(OpCodes.Ldarg_2);
             il.Emit(OpCodes.Switch, jumpTable);
             il.Emit(OpCodes.Br_S, defaultLabel);
             for (var i = 0; i < fields.Length; i++)
             {
                 il.MarkLabel(jumpTable[i]);
-                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldloc_0);
                 il.Emit(OpCodes.Ldfld, fields[i]);
                 if (fields[i].FieldType.IsValueType)
                     il.Emit(OpCodes.Box, fields[i].FieldType);

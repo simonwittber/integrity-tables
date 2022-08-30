@@ -11,9 +11,9 @@ namespace GetSetGenerator
         public TInstance Set(TInstance item, TField value);
     }
     
-    public interface IFieldIndexer<TInstance> where TInstance:struct
+    public interface IFieldIndexer
     {
-        object Get(TInstance item, int index);
+        object Get(object item, int index);
         Type[] Types();
         string[] Names();
     }

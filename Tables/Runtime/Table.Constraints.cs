@@ -14,7 +14,7 @@ public partial class Table<T>
         var fi = typeof(T).GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
         if (fi.FieldType != typeof(int?))
             throw new Exception("Foreign key fields must be of type 'int?'");
-        var getSet = Database.Compiler.Create<T, int?>(fieldName);
+        var getSet = Database.getSetCompiler.Create<T, int?>(fieldName);
         AddRelationshipConstraint(getSet.Get, getSet.Set, foreignTable, cascadeOperation, isNullable);
     }
 

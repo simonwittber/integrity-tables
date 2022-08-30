@@ -11,14 +11,17 @@ namespace Tables
     {
         private static Dictionary<Type, ITable> tables = new();
         
-        public static readonly GetSetCompiler Compiler = new GetSetCompiler();
+        public static readonly GetSetCompiler getSetCompiler = new GetSetCompiler();
+        public static readonly ExtensionCompiler indexerCompiler = new ExtensionCompiler();
 
         public static Table<T> CreateTable<T>(string primaryKeyFieldName = "id") where T:struct
         {
             if(tables.TryGetValue(typeof(T), out var existingTable))
                 return existingTable as Table<T>;
-            var getSet = Compiler.Create<T, int>(primaryKeyFieldName);
+            var getSet = getSetCompiler.Create<T, int>(primaryKeyFieldName);
+            var indexer = indexerCompiler.Create<T>();
             var table = new Table<T>(getSet.Get, getSet.Set);
+            table.indexer = indexer;
             tables.Add(typeof(T), table);
             InspectTable(table);
         

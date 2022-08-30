@@ -87,7 +87,7 @@ public class MoreComplexTests
     {
         var e = new Employee() {id = 1979};
         
-        var setter = Compiler.Create<Employee, int>("id");
+        var setter = getSetCompiler.Create<Employee, int>("id");
         Assert.NotNull(setter);
         e = setter.Set(e, 2022);
         Assert.AreEqual(2022, e.id);

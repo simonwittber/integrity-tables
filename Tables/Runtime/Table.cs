@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Reflection;
+using GetSetGenerator;
 
 namespace Tables
 {
@@ -19,11 +20,19 @@ namespace Tables
 
         private int id_count = 0;
 
+        internal IFieldIndexer indexer;
+
         internal Table(PrimaryKeyGetterDelegate<T> primaryKeyGetterFn, PrimaryKeySetterDelegate<T> primaryKeySetterFn = null)
         {
             Name = typeof(T).Name;
             _primaryKeyGetterFn = primaryKeyGetterFn;
             _primaryKeySetterFn = primaryKeySetterFn;
         }
+
+        public string[] Names => indexer.Names();
+        
+        public Type[] Types => indexer.Types();
+        public object Column(object row, int index) => indexer.Get(row, index);
+        
     }
 }
