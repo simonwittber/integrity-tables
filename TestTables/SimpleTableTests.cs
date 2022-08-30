@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using NUnit.Framework;
 using Tables;
 using static Tables.Database;
@@ -13,6 +15,13 @@ public struct TestRow
 
 }
 
+public static class TestRowExtensions {
+    public static IEnumerable Fields(this TestRow r)
+    {
+        yield return r.id;
+        yield return r.name;
+    }
+}
 
 public class SimpleTableTests
 {
@@ -26,8 +35,8 @@ public class SimpleTableTests
         Assert.AreEqual(0, (int)row.id);
         var anotherRow = table.Get(0);
         Assert.AreEqual("srw", anotherRow.name);
-        
-        
+
+                
     }
     
     

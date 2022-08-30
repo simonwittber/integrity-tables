@@ -15,7 +15,7 @@ namespace GetSetGenerator
     {
         private const string AssemblyName = "GetSet.Xyzzy";
 
-        readonly ModuleBuilder _moduleBuilder;
+        private readonly ModuleBuilder _moduleBuilder;
 
         private readonly Dictionary<(Type, Type, string), object> _cache = new Dictionary<(Type, Type, string), object>();
 

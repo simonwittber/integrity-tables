@@ -13,12 +13,15 @@ namespace Tables
         
         public static readonly GetSetCompiler Compiler = new GetSetCompiler();
 
-        public static Table<T> CreateTable<T>(string primaryKeyFieldName="id") where T:struct
+        public static Table<T> CreateTable<T>(string primaryKeyFieldName = "id") where T:struct
         {
+            if(tables.TryGetValue(typeof(T), out var existingTable))
+                return existingTable as Table<T>;
             var getSet = Compiler.Create<T, int>(primaryKeyFieldName);
             var table = new Table<T>(getSet.Get, getSet.Set);
             tables.Add(typeof(T), table);
             InspectTable(table);
+        
             return table;
         }
 
@@ -33,22 +36,13 @@ namespace Tables
                     var foreignTableType = fka.relatedType;
                     var cascadeOperation = fka.cascadeOperation;
                     table.AddRelationshipConstraint(foreignKeyFieldName, GetTable(foreignTableType), cascadeOperation, fka.isNullable);
-                    CreateExtensionMethods(table, foreignTableType, fi);
                 }
             }
         }
 
-        private static void CreateExtensionMethods<T>(Table<T> table, Type foreignTableType, FieldInfo fi) where T : struct
-        {
-            //new method on T, that returns foreignTableType, named fi.Name - "_id"
-            //which uses a foreignKeyFieldName getter to get the fk
-            
-            //new method on foreignKeyTableType, that returns list of T where t.fk == foreignKeyTable.id
-            //needs a backref name.
-        }
-
         public static Table<T> GetTable<T>() where T:struct => (Table<T>)tables[typeof(T)];
         public static ITable GetTable(Type rowType) => tables[rowType];
+        
 
         public static void DropDatabase()
         {
@@ -71,6 +65,22 @@ namespace Tables
         }
 
         public static ITable[] Tables => tables.Values.ToArray();
+        
+        
+        public static T Q<T>(int? id) where T : struct
+        {
+            return GetTable<T>().Get(id);
+        }
+
+        public static Table<T> Q<T>() where T : struct
+        {
+            return GetTable<T>();
+        }
+        
+        public static IEnumerable<T> Q<T>(Predicate<T> predicate) where T : struct
+        {
+            return Q<T>().Select(predicate);
+        }
 
     }
 }

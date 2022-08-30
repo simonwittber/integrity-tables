@@ -7,4 +7,8 @@ namespace Tables
         public bool deleted;
         public T data;
     }
+
+    public interface IRowStruct
+    {
+    }
 }
