@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -11,7 +12,7 @@ namespace GetSetGenerator
 
         private readonly ModuleBuilder _moduleBuilder;
 
-        private readonly Dictionary<(Type, Type, string), object> _cache = new Dictionary<(Type, Type, string), object>();
+        private readonly Dictionary<Type, object> _cache = new Dictionary<Type, object>();
 
         public ExtensionCompiler()
         {
@@ -20,58 +21,106 @@ namespace GetSetGenerator
             _moduleBuilder = assemblyBuilder.DefineDynamicModule(AssemblyName);
         }
 
-        public IGetSet<TInstance, TField> Create<TInstance, TField>(string fieldName)
+        public IFieldIndexer<TInstance> Create<TInstance>()where TInstance:struct
         {
-            var key = (typeof(TInstance), typeof(TField), fieldName);
-            if (!_cache.TryGetValue(key, out object getSetInstance))
-                getSetInstance = _cache[key] = _CreateGetSet<TInstance, TField>(fieldName);
-            return (IGetSet<TInstance,TField>)getSetInstance;
+            var key = typeof(TInstance);
+            if (!_cache.TryGetValue(key, out object indexerInstance))
+                indexerInstance = _cache[key] = _CreateFieldIndexer<TInstance>();
+            return (IFieldIndexer<TInstance>)indexerInstance;
         }
 
-        private IGetSet<TInstance, TField> _CreateGetSet<TInstance,TField>(string fieldName)
+        private IFieldIndexer<TInstance> _CreateFieldIndexer<TInstance>()where TInstance:struct
         {
-            var fi = typeof(TInstance).GetField(fieldName, BindingFlags.Public | BindingFlags.Instance);
-            if (fi == null)
-                throw new Exception($"Could not find field {fieldName}");
+            var fields = typeof(TInstance).GetFields(BindingFlags.Public | BindingFlags.Instance);
             
-            fi = fi.DeclaringType!.GetField(fi.Name, BindingFlags.Public | BindingFlags.Instance);
-            if (fi == null)
-                throw new Exception($"Could not find field {fieldName}");
-
-            var className = $"GetSet_{fi.DeclaringType!.FullName}_{fi.Name}";
             
+            var className = $"FieldIndex";
             var typeBuilder = _moduleBuilder.DefineType(className, TypeAttributes.Public);
-            var interfaceType = typeof(IGetSet<,>).MakeGenericType(fi.DeclaringType, fi.FieldType);
+            
+            var interfaceType = typeof(IFieldIndexer<>).MakeGenericType(typeof(TInstance));
             typeBuilder.AddInterfaceImplementation(interfaceType);
 
-            CreateSetMethod(fi.DeclaringType, fi, typeBuilder, interfaceType);
-            CreateGetMethod(fi.DeclaringType, fi, typeBuilder, interfaceType);
-            
-            return (IGetSet<TInstance,TField>)Activator.CreateInstance(typeBuilder.CreateType());
-        }
-        
-        void CreateSetMethod(Type declaringType, FieldInfo fi, TypeBuilder typeBuilder, Type interfaceType)
-        {
-            var mb = typeBuilder.DefineMethod("Set", MethodAttributes.Public | MethodAttributes.Virtual, CallingConventions.Standard, 
-                declaringType, new[] { declaringType, fi.FieldType });
-            var il = mb.GetILGenerator();
-            il.Emit(OpCodes.Ldarga_S, 1);
-            il.Emit(OpCodes.Ldarg_2);
-            il.Emit(OpCodes.Stfld, fi);
-            il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Ret);
-            typeBuilder.DefineMethodOverride(mb, interfaceType.GetMethod("Set"));
+
+            CreateGetMethod<TInstance>(typeBuilder, fields, interfaceType);
+            CreateTypesMethod<TInstance>(typeBuilder, fields, interfaceType);
+            CreateNamesMethod<TInstance>(typeBuilder, fields, interfaceType);
+
+            return (IFieldIndexer<TInstance>)Activator.CreateInstance(typeBuilder.CreateType());
+
         }
 
-        void CreateGetMethod(Type declaringType, FieldInfo fi, TypeBuilder typeBuilder, Type interfaceType)
+        private static void CreateGetMethod<TInstance>(TypeBuilder typeBuilder, FieldInfo[] fields, Type interfaceType) where TInstance : struct
         {
-            var mb = typeBuilder.DefineMethod("Get", MethodAttributes.Public | MethodAttributes.Virtual, CallingConventions.Standard, 
-                fi.FieldType, new[] { declaringType });
+            var mb = typeBuilder.DefineMethod(
+                "Get",
+                MethodAttributes.Public | MethodAttributes.Virtual, CallingConventions.Standard,
+                typeof(object),
+                new[] {typeof(TInstance), typeof(int)});
+
             var il = mb.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Ldfld, fi);
-            il.Emit(OpCodes.Ret);
+            var defaultLabel = il.DefineLabel();
+            var jumpTable = (from i in fields select il.DefineLabel()).ToArray();
+            il.Emit(OpCodes.Ldarg_2);
+            il.Emit(OpCodes.Switch, jumpTable);
+            il.Emit(OpCodes.Br_S, defaultLabel);
+            for (var i = 0; i < fields.Length; i++)
+            {
+                il.MarkLabel(jumpTable[i]);
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldfld, fields[i]);
+                if (fields[i].FieldType.IsValueType)
+                    il.Emit(OpCodes.Box, fields[i].FieldType);
+                il.Emit(OpCodes.Ret);
+            }
+
+            il.MarkLabel(defaultLabel);
+            il.ThrowException(typeof(IndexOutOfRangeException));
             typeBuilder.DefineMethodOverride(mb, interfaceType.GetMethod("Get"));
+        }
+        
+        private static void CreateTypesMethod<TInstance>(TypeBuilder typeBuilder, FieldInfo[] fields, Type interfaceType) where TInstance : struct
+        {
+            var mb = typeBuilder.DefineMethod(
+                "Types",
+                MethodAttributes.Public | MethodAttributes.Virtual, CallingConventions.Standard, typeof(Type[]), Type.EmptyTypes);
+
+            var il = mb.GetILGenerator();
+            il.Emit(OpCodes.Ldc_I4, fields.Length);
+            il.Emit(OpCodes.Newarr, typeof(Type));
+            il.Emit(OpCodes.Dup);
+            for (var i = 0; i < fields.Length; i++)
+            {
+                il.Emit(OpCodes.Ldc_I4, i);
+                il.Emit(OpCodes.Ldtoken, fields[i].FieldType);
+                il.Emit(OpCodes.Call, typeof(Type).GetMethod("GetTypeFromHandle"));
+                il.Emit(OpCodes.Stelem_Ref);
+                if (i < fields.Length - 1)
+                    il.Emit(OpCodes.Dup);
+            }
+            il.Emit(OpCodes.Ret);
+            typeBuilder.DefineMethodOverride(mb, interfaceType.GetMethod("Types"));
+        }
+        
+        private static void CreateNamesMethod<TInstance>(TypeBuilder typeBuilder, FieldInfo[] fields, Type interfaceType) where TInstance : struct
+        {
+            var mb = typeBuilder.DefineMethod(
+                "Names",
+                MethodAttributes.Public | MethodAttributes.Virtual, CallingConventions.Standard, typeof(string[]), Type.EmptyTypes);
+
+            var il = mb.GetILGenerator();
+            il.Emit(OpCodes.Ldc_I4, fields.Length);
+            il.Emit(OpCodes.Newarr, typeof(string));
+            il.Emit(OpCodes.Dup);
+            for (var i = 0; i < fields.Length; i++)
+            {
+                il.Emit(OpCodes.Ldc_I4, i);
+                il.Emit(OpCodes.Ldstr, fields[i].Name);
+                il.Emit(OpCodes.Stelem_Ref);
+                if (i < fields.Length - 1)
+                    il.Emit(OpCodes.Dup);
+            }
+            il.Emit(OpCodes.Ret);
+            typeBuilder.DefineMethodOverride(mb, interfaceType.GetMethod("Names"));
         }
     }
 }

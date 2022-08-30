@@ -5,10 +5,17 @@ using System.Reflection.Emit;
 
 namespace GetSetGenerator
 {
-    public interface IGetSet<TInstance, TField>
+    public interface IGetSet<TInstance, TField> where TInstance:struct
     {
         TField Get(TInstance item);
         public TInstance Set(TInstance item, TField value);
+    }
+    
+    public interface IFieldIndexer<TInstance> where TInstance:struct
+    {
+        object Get(TInstance item, int index);
+        Type[] Types();
+        string[] Names();
     }
     
     public class GetSetCompiler
@@ -26,7 +33,7 @@ namespace GetSetGenerator
             _moduleBuilder = assemblyBuilder.DefineDynamicModule(AssemblyName);
         }
 
-        public IGetSet<TInstance, TField> Create<TInstance, TField>(string fieldName)
+        public IGetSet<TInstance, TField> Create<TInstance, TField>(string fieldName)where TInstance:struct
         {
             var key = (typeof(TInstance), typeof(TField), fieldName);
             if (!_cache.TryGetValue(key, out object getSetInstance))
@@ -34,7 +41,7 @@ namespace GetSetGenerator
             return (IGetSet<TInstance,TField>)getSetInstance;
         }
 
-        private IGetSet<TInstance, TField> _CreateGetSet<TInstance,TField>(string fieldName)
+        private IGetSet<TInstance, TField> _CreateGetSet<TInstance,TField>(string fieldName)where TInstance:struct
         {
             var fi = typeof(TInstance).GetField(fieldName, BindingFlags.Public | BindingFlags.Instance);
             if (fi == null)
