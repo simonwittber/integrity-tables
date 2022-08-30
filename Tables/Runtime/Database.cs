@@ -40,6 +40,12 @@ namespace Tables
                     var cascadeOperation = fka.cascadeOperation;
                     table.AddRelationshipConstraint(foreignKeyFieldName, GetTable(foreignTableType), cascadeOperation, fka.isNullable);
                 }
+                var ua = fi.GetCustomAttribute<UniqueAttribute>();
+                if (ua != null)
+                {
+                    table.AddUniqueConstraint(fi.Name);
+                }
+                
             }
         }
 

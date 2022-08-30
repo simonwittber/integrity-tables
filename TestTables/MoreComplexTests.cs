@@ -27,6 +27,8 @@ public struct Department
 public struct Location
 {
     public int id;
+    [Unique]
+    public string name;
 }
 
 public class MoreComplexTests
@@ -35,6 +37,7 @@ public class MoreComplexTests
 
     private Table<Employee> emp;
     private Table<Department> dept;
+    private Table<Location> location;
 
     [SetUp]
     public void Setup()
@@ -43,7 +46,7 @@ public class MoreComplexTests
         CreateTable<Location>();
         dept = CreateTable<Department>("id");
         emp = CreateTable<Employee>("id");
-        
+        location = CreateTable<Location>();
     }
 
     [Test]
@@ -198,5 +201,22 @@ public class MoreComplexTests
         var anotherNewItem = emp.Update(newItem);
         Assert.AreEqual("Vlad", anotherNewItem.name);
         Assert.AreEqual(2, anotherNewItem.version.Value);
+    }
+
+    [Test]
+    public void UniqueTest()
+    {
+        var row1 = location.Add(new Location() {name = "X"});
+        location.Add(new Location() {name = "Y"});
+        Assert.Throws<ConstraintException>(() =>
+        {
+            location.Add(new Location() {name = "X"});
+        });
+        location.Delete(row1.id);
+        Assert.DoesNotThrow(() =>
+        {
+            location.Add(new Location() {name = "X"});
+        });
+
     }
 }

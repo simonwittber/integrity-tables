@@ -14,6 +14,7 @@ public partial class Table<T>
         var row = _rows[index];
         row.deleted = true;
         _rows[index] = row;
+        DeleteIndexedFields(data);
         AfterDelete?.Invoke(data);
     }
 
@@ -37,12 +38,40 @@ public partial class Table<T>
         return data;
     }
 
+    private void UpdateIndexedFields(T data, int pk)
+    {
+        foreach (var (fieldIndex, index) in _uniqueFields)
+        {
+            var fieldValue = indexer.Get(data, fieldIndex);
+            index[fieldValue] = pk;
+        }
+    }
+    
+    private void AddIndexedFields(T data, int pk)
+    {
+        foreach (var (fieldIndex, index) in _uniqueFields)
+        {
+            var fieldValue = indexer.Get(data, fieldIndex);
+            index.Add(fieldValue, pk);
+        }
+    }
+    
+    private void DeleteIndexedFields(T data)
+    {
+        foreach (var (fieldIndex, index) in _uniqueFields)
+        {
+            var fieldValue = indexer.Get(data, fieldIndex);
+            index.Remove(fieldValue);
+        }
+    }
+
     private int InternalAdd(T data)
     {
         var index = _rows.Count;
         var pk = _primaryKeyGetterFn(data);
         _index.Add(pk, index);
         _rows.Add(new Row<T>() {data = data, committed = false, deleted = false});
+        AddIndexedFields(data, pk);
         return pk;
     }
 
@@ -57,6 +86,7 @@ public partial class Table<T>
         currentRow.data = newData;
         currentRow.committed = false;
         SetRow(index, currentRow);
+        UpdateIndexedFields(newData, pk);
         //Try and add the old data in case of rollback. Consecutive updates will be ignored.
         _modifiedRows.TryAdd(pk, oldData);
         if (AfterUpdate != null) AfterUpdate(newData);

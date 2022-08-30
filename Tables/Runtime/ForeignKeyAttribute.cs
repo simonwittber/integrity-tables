@@ -16,3 +16,8 @@ public class ForeignKeyAttribute : System.Attribute
         this.isNullable = isNullable;
     }
 }
+
+[AttributeUsage(AttributeTargets.Field)]
+public class UniqueAttribute : System.Attribute
+{
+}

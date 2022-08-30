@@ -10,6 +10,7 @@ namespace Tables
     public partial class Table<T> : ITable, IEnumerable<T> where T:struct
     {
         private readonly List<(TriggerType, string, ConstraintDelegate<T>)> _constraints = new();
+        private readonly Dictionary<int, Dictionary<object, int>> _uniqueFields = new(); 
         private readonly Dictionary<int, T> _deletedRows = new();
         private readonly List<int> _newRows = new();
         private readonly Dictionary<int, T> _modifiedRows = new();
