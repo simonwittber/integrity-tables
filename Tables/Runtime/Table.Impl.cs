@@ -4,12 +4,12 @@ public partial class Table<T>
 {
     private T _Add(T data)
     {
-        if (_primaryKeySetterFn != null) data = _primaryKeySetterFn(data, id_count++);
+        if (SetPrimaryKey != null) data = SetPrimaryKey(data, _idCount++);
         if (BeforeAdd != null) data = BeforeAdd(data);
         _constraints.CheckConstraintsForItem(TriggerType.OnCreate, data);
         _constraints.CheckConstraintsForItem(TriggerType.OnUpdate, data);
         var index = _rows.Count;
-        var pk = _primaryKeyGetterFn(data);
+        var pk = GetPrimaryKey(data);
         _pkIndex.Add(pk, index);
         _rows.Add(new Row<T>() {data = data, committed = false, deleted = false});
         _newRows.Add(pk);
@@ -19,7 +19,7 @@ public partial class Table<T>
 
     private T _Update(T newData)
     {
-        var pk = _primaryKeyGetterFn(newData);
+        var pk = GetPrimaryKey(newData);
         var index = _pkIndex[pk];
         var currentRow = GetRow(index);
         var rollbackData = currentRow.data;
@@ -36,9 +36,9 @@ public partial class Table<T>
 
     private void _Delete(T data)
     {
-        BeforeDelete?.Invoke(_primaryKeyGetterFn(data));
+        BeforeDelete?.Invoke(GetPrimaryKey(data));
         _constraints.CheckConstraintsForItem(TriggerType.OnDelete, data);
-        var pk = _primaryKeyGetterFn(data);
+        var pk = GetPrimaryKey(data);
         var index = _pkIndex[pk];
         _deletedRows.TryAdd(pk, data);
         var row = _rows[index];

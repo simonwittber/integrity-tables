@@ -41,7 +41,7 @@ public partial class Table<T>
             var lastIndex = _rows.Count - 1;
             var lastRow = _rows[lastIndex];
             _rows[index] = lastRow;
-            _pkIndex[_primaryKeyGetterFn(lastRow.data)] = index;
+            _pkIndex[GetPrimaryKey(lastRow.data)] = index;
             _rows.RemoveAt(lastIndex);
             _pkIndex.Remove(pk);
         }
@@ -58,7 +58,7 @@ public partial class Table<T>
             var lastIndex = _rows.Count - 1;
             var lastRow = _rows[lastIndex];
             _rows[index] = lastRow;
-            _pkIndex[_primaryKeyGetterFn(lastRow.data)] = index;
+            _pkIndex[GetPrimaryKey(lastRow.data)] = index;
             _pkIndex.Remove(pk);
             _rows.RemoveAt(lastIndex);
         }

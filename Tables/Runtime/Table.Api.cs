@@ -21,6 +21,8 @@ public partial class Table<T>
     {
         return _Add(data);
     }
+    
+    public object GetField(object row, int index) => _fieldIndexer.Get(row, index);
 
     public T Update(T newData)
     {

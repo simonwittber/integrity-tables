@@ -41,11 +41,8 @@ public class RelationalDataTests
     }
 
     
-
     private Table<Employee> emp;
     private Table<Department> dept;
-
-
 
     [SetUp]
     public void Setup()
@@ -54,15 +51,9 @@ public class RelationalDataTests
         dept = CreateTable<Department>();
 
         emp = CreateTable<Employee>();
-
-
         emp.AddRelationshipConstraint("manager_id", emp, CascadeOperation.SetNull, true);
-
         emp.AddRelationshipConstraint("department_id", dept, CascadeOperation.Delete, true);
-
     }
-
-    
 
     [Test]
     public void TestPKFn()

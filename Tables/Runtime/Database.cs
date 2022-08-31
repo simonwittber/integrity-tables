@@ -11,45 +11,24 @@ namespace Tables
     {
         private static Dictionary<Type, ITable> tables = new();
         
-        public static readonly GetSetCompiler getSetCompiler = new GetSetCompiler();
-        public static readonly ExtensionCompiler indexerCompiler = new ExtensionCompiler();
+        public static readonly GetSetCompiler GetSetCompiler = new GetSetCompiler();
+        public static readonly ExtensionCompiler IndexerCompiler = new ExtensionCompiler();
 
         public static Table<T> CreateTable<T>(string primaryKeyFieldName = "id") where T:struct
         {
             if(tables.TryGetValue(typeof(T), out var existingTable))
                 return existingTable as Table<T>;
-            var getSet = getSetCompiler.Create<T, int>(primaryKeyFieldName);
-            var indexer = indexerCompiler.Create<T>();
-            var table = new Table<T>(getSet.Get, getSet.Set);
-            table.indexer = indexer;
+            var getSet = GetSetCompiler.Create<T, int>(primaryKeyFieldName);
+            var indexer = IndexerCompiler.Create<T>();
+            var table = new Table<T>(indexer, getSet.Get, getSet.Set);
             tables.Add(typeof(T), table);
-            InspectTable(table);
+            SetupTableConstraints(table);
         
             return table;
         }
 
-        private static void InspectTable<T>(Table<T> table) where T : struct
-        {
-            foreach (var fi in typeof(T).GetFields(BindingFlags.Public | BindingFlags.Instance))
-            {
-                var fka = fi.GetCustomAttribute<ForeignKeyAttribute>();
-                if (fka != null)
-                {
-                    var foreignKeyFieldName = fi.Name;
-                    var foreignTableType = fka.relatedType;
-                    var cascadeOperation = fka.cascadeOperation;
-                    table.AddRelationshipConstraint(foreignKeyFieldName, GetTable(foreignTableType), cascadeOperation, fka.isNullable);
-                }
-                var ua = fi.GetCustomAttribute<UniqueAttribute>();
-                if (ua != null)
-                {
-                    table.AddUniqueConstraint(fi.Name);
-                }
-                
-            }
-        }
-
         public static Table<T> GetTable<T>() where T:struct => (Table<T>)tables[typeof(T)];
+        
         public static ITable GetTable(Type rowType) => tables[rowType];
         
 
@@ -89,6 +68,26 @@ namespace Tables
         public static IEnumerable<T> Q<T>(Predicate<T> predicate) where T : struct
         {
             return Q<T>().Select(predicate);
+        }
+
+        private static void SetupTableConstraints<T>(Table<T> table) where T : struct
+        {
+            foreach (var fi in typeof(T).GetFields(BindingFlags.Public | BindingFlags.Instance))
+            {
+                var fka = fi.GetCustomAttribute<ForeignKeyAttribute>();
+                if (fka != null)
+                {
+                    var foreignKeyFieldName = fi.Name;
+                    var foreignTableType = fka.relatedType;
+                    var cascadeOperation = fka.cascadeOperation;
+                    table.AddRelationshipConstraint(foreignKeyFieldName, GetTable(foreignTableType), cascadeOperation, fka.isNullable);
+                }
+                var ua = fi.GetCustomAttribute<UniqueAttribute>();
+                if (ua != null)
+                {
+                    table.AddUniqueConstraint(fi.Name);
+                }
+            }
         }
 
     }

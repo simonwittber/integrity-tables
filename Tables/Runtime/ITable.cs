@@ -17,6 +17,6 @@ namespace Tables
 
         public string[] Names { get; }
         public Type[] Types { get; }
-        public object Column(object row, int index);
+        public object GetField(object row, int index);
     }
 }

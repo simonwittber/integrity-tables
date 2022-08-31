@@ -10,35 +10,31 @@ namespace Tables
     public partial class Table<T> : ITable, IEnumerable<T> where T:struct
     {
         
-         
         private readonly Dictionary<int, T> _deletedRows = new();
         private readonly List<int> _newRows = new();
         private readonly Dictionary<int, T> _modifiedRows = new();
         private readonly Dictionary<int, int> _pkIndex = new();
-        internal readonly PrimaryKeyGetterDelegate<T> _primaryKeyGetterFn;
-        private readonly PrimaryKeySetterDelegate<T> _primaryKeySetterFn;
+
+        internal readonly PrimaryKeySetterDelegate<T> SetPrimaryKey;
+        internal readonly PrimaryKeyGetterDelegate<T> GetPrimaryKey;
+        private IFieldIndexer _fieldIndexer;
+        
         private readonly List<Row<T>> _rows = new();
 
         private readonly Index<T> _index;
         private readonly ConstraintCollection<T> _constraints;
 
-        private int id_count = 0;
+        private int _idCount = 0;
 
-        internal IFieldIndexer indexer;
-
-        internal Table(PrimaryKeyGetterDelegate<T> primaryKeyGetterFn, PrimaryKeySetterDelegate<T> primaryKeySetterFn = null)
+        internal Table(IFieldIndexer fieldIndexer, PrimaryKeyGetterDelegate<T> getPrimaryKey, PrimaryKeySetterDelegate<T> setPrimaryKey = null)
         {
             Name = typeof(T).Name;
-            _primaryKeyGetterFn = primaryKeyGetterFn;
-            _primaryKeySetterFn = primaryKeySetterFn;
+            _fieldIndexer = fieldIndexer;
+            GetPrimaryKey = getPrimaryKey;
+            SetPrimaryKey = setPrimaryKey;
             _index = new Index<T>(this);
             _constraints = new ConstraintCollection<T>(this);
         }
 
-        public string[] Names => indexer.Names();
-        
-        public Type[] Types => indexer.Types();
-        public object Column(object row, int index) => indexer.Get(row, index);
-        
     }
 }

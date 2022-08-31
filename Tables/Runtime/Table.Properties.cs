@@ -3,7 +3,11 @@ namespace Tables;
 public partial class Table<T>
 {
     public string Name { get; private set; }
-
+    
+    public string[] Names => _fieldIndexer.Names();
+        
+    public Type[] Types => _fieldIndexer.Types();
+        
     public int RowCount
     {
         get
@@ -37,7 +41,7 @@ public partial class Table<T>
         set
         {
             var newData = value;
-            var pk = _primaryKeyGetterFn(newData);
+            var pk = GetPrimaryKey(newData);
             if (pk != id) throw new ConstraintException("Cannot change a primary key.");
             Update(newData);
         }
