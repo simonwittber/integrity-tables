@@ -17,7 +17,7 @@ public partial class Table<T>
         for (var i = 0; i < _newRows.Count; i++)
         {
             var pk = _newRows[i];
-            var index = _index[pk];
+            var index = _pkIndex[pk];
             var row = _rows[index];
             row.committed = true;
             _rows[index] = row;
@@ -27,7 +27,7 @@ public partial class Table<T>
 
         foreach (var pk in _modifiedRows.Keys)
         {
-            var index = _index[pk];
+            var index = _pkIndex[pk];
             var row = _rows[index];
             row.committed = true;
             _rows[index] = row;
@@ -37,13 +37,13 @@ public partial class Table<T>
 
         foreach (var (pk, item) in _deletedRows)
         {
-            var index = _index[pk];
+            var index = _pkIndex[pk];
             var lastIndex = _rows.Count - 1;
             var lastRow = _rows[lastIndex];
             _rows[index] = lastRow;
-            _index[_primaryKeyGetterFn(lastRow.data)] = index;
+            _pkIndex[_primaryKeyGetterFn(lastRow.data)] = index;
             _rows.RemoveAt(lastIndex);
-            _index.Remove(pk);
+            _pkIndex.Remove(pk);
         }
 
         _deletedRows.Clear();
@@ -54,12 +54,12 @@ public partial class Table<T>
         for (int i = 0, len = _newRows.Count; i < len; i++)
         {
             var pk = _newRows[i];
-            var index = _index[pk];
+            var index = _pkIndex[pk];
             var lastIndex = _rows.Count - 1;
             var lastRow = _rows[lastIndex];
             _rows[index] = lastRow;
-            _index[_primaryKeyGetterFn(lastRow.data)] = index;
-            _index.Remove(pk);
+            _pkIndex[_primaryKeyGetterFn(lastRow.data)] = index;
+            _pkIndex.Remove(pk);
             _rows.RemoveAt(lastIndex);
         }
 
@@ -67,7 +67,7 @@ public partial class Table<T>
 
         foreach (var (pk, data) in _modifiedRows)
         {
-            var index = _index[pk];
+            var index = _pkIndex[pk];
             var row = _rows[index];
             row.data = data;
             _rows[index] = row;
@@ -77,12 +77,12 @@ public partial class Table<T>
 
         foreach (var (pk, data) in _deletedRows)
         {
-            var index = _index[pk];
+            var index = _pkIndex[pk];
             var row = _rows[index];
             row.deleted = false;
             row.data = data;
             _rows[index] = row;
-            _index[pk] = index;
+            _pkIndex[pk] = index;
         }
 
         _deletedRows.Clear();

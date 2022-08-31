@@ -5,7 +5,7 @@ namespace Tables
     public delegate void BeforeDeleteDelegate(int id);
     public delegate void AfterDeleteDelegate<T>(T item);
     public delegate T BeforeUpdateDelegate<T>(T oldItem, T newItem);
-    public delegate void AfterUpdateDelegate<T>(T item);
+    public delegate void AfterUpdateDelegate<T>(T item, T newItem);
     public delegate bool ConstraintDelegate<T>(T item);
     public delegate int? ForeignKeyGetterDelegate<T>(T item);
     public delegate T ForeignKeySetterDelegate<T>(T item, int? fk);

@@ -61,22 +61,11 @@ public partial class Table<T>
         }
 
         var pk = _primaryKeyGetterFn(item);
-        foreach(var (fieldIndex, index) in _uniqueFields)
-        {
-            var fieldValue = indexer.Get(item, fieldIndex);
-            if (index.TryGetValue(fieldValue, out var existingIndex) && existingIndex != pk)
-            {
-                var names = indexer.Names();
-                
-                throw new ConstraintException($"Unique Index Failed({names[fieldIndex]})");
-            }
-        }
+        
     }
 
     public void AddUniqueConstraint(string fieldName)
     {
-        var names = indexer.Names();
-        var fieldIndex = System.Array.IndexOf(names, fieldName);
-        _uniqueFields.Add(fieldIndex, new Dictionary<object, int>());
+        _index.AddConstraint(fieldName);
     }
 }

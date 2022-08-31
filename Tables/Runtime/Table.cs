@@ -10,14 +10,16 @@ namespace Tables
     public partial class Table<T> : ITable, IEnumerable<T> where T:struct
     {
         private readonly List<(TriggerType, string, ConstraintDelegate<T>)> _constraints = new();
-        private readonly Dictionary<int, Dictionary<object, int>> _uniqueFields = new(); 
+         
         private readonly Dictionary<int, T> _deletedRows = new();
         private readonly List<int> _newRows = new();
         private readonly Dictionary<int, T> _modifiedRows = new();
-        private readonly Dictionary<int, int> _index = new();
-        private readonly PrimaryKeyGetterDelegate<T> _primaryKeyGetterFn;
+        private readonly Dictionary<int, int> _pkIndex = new();
+        internal readonly PrimaryKeyGetterDelegate<T> _primaryKeyGetterFn;
         private readonly PrimaryKeySetterDelegate<T> _primaryKeySetterFn;
         private readonly List<Row<T>> _rows = new();
+
+        private readonly Index<T> _index;
 
         private int id_count = 0;
 
@@ -28,6 +30,7 @@ namespace Tables
             Name = typeof(T).Name;
             _primaryKeyGetterFn = primaryKeyGetterFn;
             _primaryKeySetterFn = primaryKeySetterFn;
+            _index = new Index<T>(this);
         }
 
         public string[] Names => indexer.Names();

@@ -6,91 +6,25 @@ public partial class Table<T>
 {
     public void Delete(T data)
     {
-        BeforeDelete?.Invoke(_primaryKeyGetterFn(data));
-        CheckConstraintsForItem(TriggerType.OnDelete, data);
-        var pk = _primaryKeyGetterFn(data);
-        var index = _index[pk];
-        _deletedRows.TryAdd(pk, data);
-        var row = _rows[index];
-        row.deleted = true;
-        _rows[index] = row;
-        DeleteIndexedFields(data);
-        AfterDelete?.Invoke(data);
+        _Delete(data);
     }
 
     public int Delete(Predicate<T> predicateFn) => Apply(Delete, predicateFn);
     
     public void Delete(int id) => Delete(Get(id));
 
-    public T Get(int id) => GetRow(_index[id]).data;
+    public T Get(int id) => GetRow(_pkIndex[id]).data;
     
-    public T Get(int? id) => GetRow(_index[id.Value]).data;
+    public T Get(int? id) => GetRow(_pkIndex[id.Value]).data;
 
     public T Add(T data)
     {
-        if (_primaryKeySetterFn != null) data = _primaryKeySetterFn(data, id_count++);
-        if (BeforeAdd != null) data = BeforeAdd(data);
-        CheckConstraintsForItem(TriggerType.OnCreate, data);
-        CheckConstraintsForItem(TriggerType.OnUpdate, data);
-        var pk = InternalAdd(data);
-        _newRows.Add(pk);
-        if (AfterAdd != null) AfterAdd(data);
-        return data;
-    }
-
-    private void UpdateIndexedFields(T data, int pk)
-    {
-        foreach (var (fieldIndex, index) in _uniqueFields)
-        {
-            var fieldValue = indexer.Get(data, fieldIndex);
-            index[fieldValue] = pk;
-        }
-    }
-    
-    private void AddIndexedFields(T data, int pk)
-    {
-        foreach (var (fieldIndex, index) in _uniqueFields)
-        {
-            var fieldValue = indexer.Get(data, fieldIndex);
-            index.Add(fieldValue, pk);
-        }
-    }
-    
-    private void DeleteIndexedFields(T data)
-    {
-        foreach (var (fieldIndex, index) in _uniqueFields)
-        {
-            var fieldValue = indexer.Get(data, fieldIndex);
-            index.Remove(fieldValue);
-        }
-    }
-
-    private int InternalAdd(T data)
-    {
-        var index = _rows.Count;
-        var pk = _primaryKeyGetterFn(data);
-        _index.Add(pk, index);
-        _rows.Add(new Row<T>() {data = data, committed = false, deleted = false});
-        AddIndexedFields(data, pk);
-        return pk;
+        return _Add(data);
     }
 
     public T Update(T newData)
     {
-        var pk = _primaryKeyGetterFn(newData);
-        var index = _index[pk];
-        var currentRow = GetRow(index);
-        var oldData = currentRow.data;
-        if (BeforeUpdate != null) newData = BeforeUpdate(oldData, newData);
-        CheckConstraintsForItem(TriggerType.OnUpdate, newData);
-        currentRow.data = newData;
-        currentRow.committed = false;
-        SetRow(index, currentRow);
-        UpdateIndexedFields(newData, pk);
-        //Try and add the old data in case of rollback. Consecutive updates will be ignored.
-        _modifiedRows.TryAdd(pk, oldData);
-        if (AfterUpdate != null) AfterUpdate(newData);
-        return newData;
+        return _Update(newData);
     }
 
     public int Update(ModifyDelegate<T> modifyFn, Predicate<T> predicateFn)
@@ -135,7 +69,7 @@ public partial class Table<T>
         }
     }
 
-    public bool ContainsKey(int key) => _index.ContainsKey(key);
+    public bool ContainsKey(int key) => _pkIndex.ContainsKey(key);
 
     public int Apply(RowAction<T> applyFn, Predicate<T> predicateFn)
     {

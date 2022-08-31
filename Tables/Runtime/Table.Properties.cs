@@ -33,16 +33,13 @@ public partial class Table<T>
 
     public T this[int id]
     {
-        get => GetRow(_index[id]).data;
+        get => GetRow(_pkIndex[id]).data;
         set
         {
             var newData = value;
-            var row = GetRow(_index[id]);
-            if (BeforeUpdate != null) newData = BeforeUpdate.Invoke(row.data, newData);
-            CheckConstraintsForItem(TriggerType.OnUpdate, newData);
-            row.data = newData;
-            SetRow(_index[id], row);
-            if (AfterUpdate != null) AfterUpdate(newData);
+            var pk = _primaryKeyGetterFn(newData);
+            if (pk != id) throw new ConstraintException("Cannot change a primary key.");
+            Update(newData);
         }
     }
 
