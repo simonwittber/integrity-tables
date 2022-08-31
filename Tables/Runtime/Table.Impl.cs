@@ -6,8 +6,8 @@ public partial class Table<T>
     {
         if (_primaryKeySetterFn != null) data = _primaryKeySetterFn(data, id_count++);
         if (BeforeAdd != null) data = BeforeAdd(data);
-        CheckConstraintsForItem(TriggerType.OnCreate, data);
-        CheckConstraintsForItem(TriggerType.OnUpdate, data);
+        _constraints.CheckConstraintsForItem(TriggerType.OnCreate, data);
+        _constraints.CheckConstraintsForItem(TriggerType.OnUpdate, data);
         var index = _rows.Count;
         var pk = _primaryKeyGetterFn(data);
         _pkIndex.Add(pk, index);
@@ -24,7 +24,7 @@ public partial class Table<T>
         var currentRow = GetRow(index);
         var rollbackData = currentRow.data;
         if (BeforeUpdate != null) newData = BeforeUpdate(rollbackData, newData);
-        CheckConstraintsForItem(TriggerType.OnUpdate, newData);
+        _constraints.CheckConstraintsForItem(TriggerType.OnUpdate, newData);
         currentRow.data = newData;
         currentRow.committed = false;
         SetRow(index, currentRow);
@@ -37,7 +37,7 @@ public partial class Table<T>
     private void _Delete(T data)
     {
         BeforeDelete?.Invoke(_primaryKeyGetterFn(data));
-        CheckConstraintsForItem(TriggerType.OnDelete, data);
+        _constraints.CheckConstraintsForItem(TriggerType.OnDelete, data);
         var pk = _primaryKeyGetterFn(data);
         var index = _pkIndex[pk];
         _deletedRows.TryAdd(pk, data);

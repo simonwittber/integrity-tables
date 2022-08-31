@@ -9,7 +9,7 @@ namespace Tables
 {
     public partial class Table<T> : ITable, IEnumerable<T> where T:struct
     {
-        private readonly List<(TriggerType, string, ConstraintDelegate<T>)> _constraints = new();
+        
          
         private readonly Dictionary<int, T> _deletedRows = new();
         private readonly List<int> _newRows = new();
@@ -20,6 +20,7 @@ namespace Tables
         private readonly List<Row<T>> _rows = new();
 
         private readonly Index<T> _index;
+        private readonly ConstraintCollection<T> _constraints;
 
         private int id_count = 0;
 
@@ -31,6 +32,7 @@ namespace Tables
             _primaryKeyGetterFn = primaryKeyGetterFn;
             _primaryKeySetterFn = primaryKeySetterFn;
             _index = new Index<T>(this);
+            _constraints = new ConstraintCollection<T>(this);
         }
 
         public string[] Names => indexer.Names();

@@ -56,24 +56,9 @@ public class RelationalDataTests
         emp = CreateTable<Employee>();
 
 
-        emp.AddRelationshipConstraint(
-            i => i.manager_id,
-            (i, fk) =>
-            {
-                i.manager_id = fk;
-                return i;
-            },
-            emp,
-            CascadeOperation.SetNull, isNullable:true);
-        emp.AddRelationshipConstraint(
-            e => e.department_id,
-            (e, fk) =>
-            {
-                e.department_id = fk;
-                return e;
-            },
-            dept,
-            CascadeOperation.Delete, isNullable:true);
+        emp.AddRelationshipConstraint("manager_id", emp, CascadeOperation.SetNull, true);
+
+        emp.AddRelationshipConstraint("department_id", dept, CascadeOperation.Delete, true);
 
     }
 

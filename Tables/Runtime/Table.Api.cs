@@ -138,6 +138,21 @@ public partial class Table<T>
             if (!row.deleted) yield return row.data;
         }
     }
+    
+    public void AddConstraint(TriggerType triggerType, string constraintName, ConstraintDelegate<T> constraintFn)
+    {
+        _constraints.Add(triggerType, constraintName, constraintFn);
+    }
+
+    public void AddUniqueConstraint(string fieldName)
+    {
+        _index.AddConstraint(fieldName);
+    }
+
+    public void AddRelationshipConstraint(string foreignKeyFieldName, ITable table, CascadeOperation cascadeOperation, bool isNullable)
+    {
+        _constraints.AddRelationship(foreignKeyFieldName, table, cascadeOperation, isNullable);
+    }
 
     IEnumerator IEnumerable.GetEnumerator()
     {
