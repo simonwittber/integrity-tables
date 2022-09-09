@@ -146,9 +146,9 @@ public partial class Table<T>
         _constraints.Add(triggerType, constraintName, constraintFn);
     }
 
-    public void AddUniqueConstraint(string fieldName)
+    public void AddUniqueConstraint(string indexName, params string[] fieldNames)
     {
-        _index.AddConstraint(fieldName);
+        _index.AddConstraint(indexName, fieldNames);
     }
 
     public void AddRelationshipConstraint(string foreignKeyFieldName, ITable table, CascadeOperation cascadeOperation, bool isNullable)

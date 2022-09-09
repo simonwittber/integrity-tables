@@ -32,11 +32,24 @@ namespace GetSetGenerator
         private IFieldIndexer _CreateFieldIndexer<TInstance>()where TInstance:struct
         {
             var fields = typeof(TInstance).GetFields(BindingFlags.Public | BindingFlags.Instance);
+
+
+            var className = $"FieldIndexer_{typeof(TInstance).Namespace}_{typeof(TInstance).Name}";
+            if (typeof(TInstance).IsGenericType)
+            {
+                className = $"{className}_{string.Join("_", from i in typeof(TInstance).GenericTypeArguments select i.ToString())}";
+            }
             
-            
-            var className = $"FieldIndexer_{typeof(TInstance).Namespace}_{typeof(TInstance).Name}_{typeof(TInstance).GUID}";
-            var typeBuilder = _moduleBuilder.DefineType(className, TypeAttributes.Public);
-            
+            TypeBuilder typeBuilder;
+            try
+            {
+                typeBuilder = _moduleBuilder.DefineType(className, TypeAttributes.Public);
+            }
+            catch (ArgumentException e)
+            {
+                throw new ArgumentException($"{e.Message} ({className})");
+            }
+
             var interfaceType = typeof(IFieldIndexer);
             typeBuilder.AddInterfaceImplementation(interfaceType);
 

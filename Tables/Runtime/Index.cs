@@ -1,8 +1,8 @@
 namespace Tables;
 
-public class Index<T> where T:struct
+public partial class Index<T> where T:struct
 {
-    private readonly Dictionary<int, Dictionary<object, int>> _fieldIndexes = new();
+    private readonly Dictionary<string, Dictionary<IndexKey, int>> _fieldIndexes = new();
     private readonly Table<T> _table;
 
     public Index(Table<T> table)
@@ -10,72 +10,93 @@ public class Index<T> where T:struct
         this._table = table;
     }
 
-    public void AddConstraint(string fieldName)
+    public void AddConstraint(string indexName, params string[] uniqueFieldNames)
     {
-        var fieldNames = _table.Names;
-        var fieldIndex = System.Array.IndexOf(fieldNames, fieldName);
-        if (fieldIndex < 0) throw new KeyNotFoundException($"Unknown field name: {fieldName}");
-        _fieldIndexes[fieldIndex] = new Dictionary<object, int>(); 
-        _table.BeforeAdd += CheckFieldValueIsUnique(fieldIndex);
-        _table.AfterAdd += SaveUniqueFieldValue(fieldIndex);
-        _table.BeforeUpdate += CheckFieldValueIsStillUnique(fieldIndex);
-        _table.AfterUpdate += UpdateUniqueFieldValue(fieldIndex);
-        _table.AfterDelete += RemoveUniqueFieldValue(fieldIndex);
+        var allFieldNames = _table.Names;
+        var fieldIndexes = new int[uniqueFieldNames.Length];
+        for (var i = 0; i < uniqueFieldNames.Length; i++)
+        {
+            var fieldName = uniqueFieldNames[i];
+            var fieldIndex = System.Array.IndexOf(allFieldNames, fieldName);
+            if (fieldIndex < 0) throw new KeyNotFoundException($"Unknown field name: {fieldName}");
+            fieldIndexes[i] = fieldIndex;
+        }
+        
+        var idx = _fieldIndexes[indexName] = new Dictionary<IndexKey, int>(); 
+        _table.BeforeAdd += CheckFieldValueIsUnique(idx, fieldIndexes);
+        _table.AfterAdd += SaveUniqueFieldValue(idx, fieldIndexes);
+        _table.BeforeUpdate += CheckFieldValueIsStillUnique(idx, fieldIndexes);
+        _table.AfterUpdate += UpdateUniqueFieldValue(idx, fieldIndexes);
+        _table.AfterDelete += RemoveUniqueFieldValue(idx, fieldIndexes);
     }
 
-    private BeforeUpdateDelegate<T> CheckFieldValueIsStillUnique(int fieldIndex)
+    private BeforeUpdateDelegate<T> CheckFieldValueIsStillUnique(Dictionary<IndexKey, int> index, int[] fieldIndexes)
     {
         return (item, newItem) =>
         {
-            var fieldValue = _table.GetField(newItem, fieldIndex);
-            if (_fieldIndexes[fieldIndex].ContainsKey(fieldValue))
+            var indexKey = CreateIndexkey(fieldIndexes, newItem);
+
+            if (index.ContainsKey(indexKey))
             {
-                throw new ConstraintException($"Unique Index violation on {_table.Names[fieldIndex]}");
+                throw new ConstraintException($"Unique Index violation");
             }
+            
             return newItem;
         };
     }
 
-    private AfterDeleteDelegate<T> RemoveUniqueFieldValue(int fieldIndex)
+    private IndexKey CreateIndexkey(int[] fieldIndexes, T item)
+    {
+        var indexKey = new IndexKey();
+        for (var i = 0; i < fieldIndexes.Length; i++)
+        {
+            var fieldIndex = fieldIndexes[i];
+            indexKey.SetValue(fieldIndex, _table.GetField(item, fieldIndex));
+        }
+
+        return indexKey;
+    }
+
+    private AfterDeleteDelegate<T> RemoveUniqueFieldValue(Dictionary<IndexKey, int> index, int[] fieldIndexes)
     {
         return item =>
         {
-            var fieldValue = _table.GetField(item, fieldIndex);
-            _fieldIndexes[fieldIndex].Remove(fieldValue);
+            var indexKey = CreateIndexkey(fieldIndexes, item);
+            index.Remove(indexKey);
         };
     }
 
-    private AfterUpdateDelegate<T> UpdateUniqueFieldValue(int fieldIndex)
+    private AfterUpdateDelegate<T> UpdateUniqueFieldValue(Dictionary<IndexKey, int> index, int[] fieldIndexes)
     {
         return (item, newItem) =>
         {
-            var idx = _fieldIndexes[fieldIndex];
-            var oldFieldValue = _table.GetField(item, fieldIndex);
-            var newFieldValue = _table.GetField(item, fieldIndex);
             var pk = _table.GetPrimaryKey(newItem);
-            idx.Remove(oldFieldValue);
-            idx.Add(newFieldValue, pk);
+            
+            var oldIndexKey = CreateIndexkey(fieldIndexes, item);
+            index.Remove(oldIndexKey);
+            var newIndexKey = CreateIndexkey(fieldIndexes, newItem);
+            index.Add(newIndexKey, pk);
         };
     }
 
-    private AfterAddDelegate<T> SaveUniqueFieldValue(int fieldIndex) 
+    private AfterAddDelegate<T> SaveUniqueFieldValue(Dictionary<IndexKey, int> index, int[] fieldIndexes) 
     {
         return item =>
         {
-            var fieldValue = _table.GetField(item, fieldIndex);
+            var indexKey = CreateIndexkey(fieldIndexes, item);
             var pk = _table.GetPrimaryKey(item);
-            _fieldIndexes[fieldIndex].Add(fieldValue, pk);
+            index.Add(indexKey, pk);
         };
     }
 
-    private BeforeAddDelegate<T> CheckFieldValueIsUnique(int fieldIndex) 
+    private BeforeAddDelegate<T> CheckFieldValueIsUnique(Dictionary<IndexKey, int> index, int[] fieldIndexes) 
     {
         return item =>
         {
-            var fieldvalue = _table.GetField(item, fieldIndex);
-            if (_fieldIndexes[fieldIndex].ContainsKey(fieldvalue))
+            var indexKey = CreateIndexkey(fieldIndexes, item);
+            if (index.ContainsKey(indexKey))
             {
-                throw new ConstraintException($"Unique Index violation on {_table.Names[fieldIndex]}");
+                throw new ConstraintException($"Unique Index violation");
             }
             return item;
         };

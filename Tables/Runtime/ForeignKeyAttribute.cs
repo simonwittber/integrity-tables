@@ -20,4 +20,10 @@ public class ForeignKeyAttribute : System.Attribute
 [AttributeUsage(AttributeTargets.Field)]
 public class UniqueAttribute : System.Attribute
 {
+    public readonly string indexName;
+
+    public UniqueAttribute(string indexName = null)
+    {
+        this.indexName = indexName;
+    }
 }

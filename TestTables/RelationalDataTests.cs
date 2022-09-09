@@ -17,7 +17,7 @@ public static class EmployeeExtensionMethods
 public class RelationalDataTests
 {
     
-    public struct Employee
+    public struct Emp
     {
         public int id;
         public string name;
@@ -33,7 +33,7 @@ public class RelationalDataTests
         }
     }
 
-    public struct Department
+    public struct Dept
     {
         public int id;
         public string name;
@@ -41,16 +41,16 @@ public class RelationalDataTests
     }
 
     
-    private Table<Employee> emp;
-    private Table<Department> dept;
+    private Table<Emp> emp;
+    private Table<Dept> dept;
 
     [SetUp]
     public void Setup()
     {
         DropDatabase();
-        dept = CreateTable<Department>();
+        dept = CreateTable<Dept>();
 
-        emp = CreateTable<Employee>();
+        emp = CreateTable<Emp>();
         emp.AddRelationshipConstraint("manager_id", emp, CascadeOperation.SetNull, true);
         emp.AddRelationshipConstraint("department_id", dept, CascadeOperation.Delete, true);
     }

@@ -72,6 +72,7 @@ namespace Tables
 
         private static void SetupTableConstraints<T>(Table<T> table) where T : struct
         {
+            var uniqueConstraints = new Dictionary<string, List<string>>();
             foreach (var fi in typeof(T).GetFields(BindingFlags.Public | BindingFlags.Instance))
             {
                 var fka = fi.GetCustomAttribute<ForeignKeyAttribute>();
@@ -85,8 +86,16 @@ namespace Tables
                 var ua = fi.GetCustomAttribute<UniqueAttribute>();
                 if (ua != null)
                 {
-                    table.AddUniqueConstraint(fi.Name);
+                    var indexName = ua.indexName ?? fi.Name;
+                    if (!uniqueConstraints.TryGetValue(indexName, out var fieldNames))
+                        fieldNames = uniqueConstraints[indexName] = new List<string>();
+                    fieldNames.Add(fi.Name);
                 }
+            }
+
+            foreach (var (constraintName, fieldNames) in uniqueConstraints)
+            {
+                table.AddUniqueConstraint(constraintName, fieldNames.ToArray());
             }
         }
 
