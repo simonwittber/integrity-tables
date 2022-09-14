@@ -131,6 +131,18 @@ public partial class Table<T>
             applyFn(row.data);
         }
     }
+    
+    public void When(Predicate<T> predicateFn, RowAction<T> actionFn)
+    {
+        AfterAdd += item =>
+        {
+            if (predicateFn(item)) actionFn(item);
+        };
+        AfterUpdate += (oldItem, newItem) =>
+        {
+            if (!predicateFn(oldItem) && predicateFn(newItem)) actionFn(newItem);
+        };
+    }
 
     public IEnumerator<T> GetEnumerator()
     {

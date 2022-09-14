@@ -8,7 +8,4 @@ namespace Tables
         public T data;
     }
 
-    public interface IRowStruct
-    {
-    }
 }

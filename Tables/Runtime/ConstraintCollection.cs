@@ -2,7 +2,7 @@ using System.Reflection;
 
 namespace Tables;
 
-public class ConstraintCollection<T> where T : struct
+internal class ConstraintCollection<T> where T : struct
 {
     private readonly Table<T> table;
     private List<(TriggerType, string, ConstraintDelegate<T>)> _constraints;

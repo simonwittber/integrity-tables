@@ -14,6 +14,7 @@ public struct Employee
     [ForeignKey(typeof(Department), CascadeOperation.Delete, isNullable:true)] public int? department_id;
     public int? version;
     [ForeignKey(typeof(Employee), CascadeOperation.SetNull, isNullable:true)] public int? manager_id;
+    public float salary;
 }
 
 public struct Department
@@ -47,6 +48,31 @@ public class MoreComplexTests
         dept = CreateTable<Department>("id");
         emp = CreateTable<Employee>("id");
         location = CreateTable<Location>();
+    }
+
+    [Test]
+    public void WhenTest()
+    {
+        var fired = false;
+        emp.When(employee => employee.salary > 1000, item =>
+        {
+            fired = true;
+        });
+        Assert.IsFalse(fired);
+        emp.Add(new Employee() {salary = 999});
+        Assert.IsFalse(fired);
+        var e = emp.Add(new Employee() {salary = 9999});
+        Assert.IsTrue(fired);
+        fired = false;
+        e.salary = 999999;
+        emp.Update(e);
+        Assert.IsFalse(fired);
+        e.salary = 999;
+        emp.Update(e);
+        Assert.IsFalse(fired);
+        e.salary = 999999;
+        emp.Update(e);
+        Assert.IsTrue(fired);
     }
 
     [Test]

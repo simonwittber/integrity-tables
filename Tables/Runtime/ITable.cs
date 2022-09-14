@@ -15,7 +15,7 @@ namespace Tables
         
         public BeforeDeleteDelegate BeforeDelete { get; set; }
 
-        public string[] Names { get; }
+        public string[] FieldNames { get; }
         public Type[] Types { get; }
         public object GetField(object row, int index);
     }

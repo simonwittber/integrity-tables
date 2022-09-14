@@ -1,6 +1,4 @@
-﻿using System.Collections;
-
-namespace Tables;
+﻿namespace Tables;
 
 public partial class Table<T>
 {

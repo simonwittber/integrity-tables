@@ -4,7 +4,7 @@ public partial class Table<T>
 {
     public string Name { get; private set; }
     
-    public string[] Names => _fieldIndexer.Names();
+    public string[] FieldNames => _fieldIndexer.Names();
         
     public Type[] Types => _fieldIndexer.Types();
         
