@@ -10,6 +10,58 @@ namespace Tables
         public static readonly GetSetCompiler GetSetCompiler = new GetSetCompiler();
         public static readonly ExtensionCompiler IndexerCompiler = new ExtensionCompiler();
 
+        public static DatabaseMetadata GetMetadata()
+        {
+            string TypeName(Type t)
+            {
+                if (t.IsGenericType && ! t.IsConstructedGenericType)
+                {
+                    var name = t.Name;
+                    return name.Substring(0, name.LastIndexOf('`'));
+                }
+                if (t.IsConstructedGenericType)
+                {
+                    var genericArguments = t.GetGenericArguments();
+                    var argumentString = string.Join(",", from i in genericArguments select TypeName(i));
+                    return $"{TypeName(t.GetGenericTypeDefinition())}<{argumentString}>";
+                }
+
+                return t.Name;
+            }
+            
+            var metadata = new DatabaseMetadata();
+            foreach (var (tableType, table) in tables)
+            {
+                var tableMetaData = new TableMetadata();
+                tableMetaData.name = TypeName(tableType);
+                metadata.tables.Add(tableMetaData);
+                var names = table.FieldNames;
+                var columnTypes = table.Types;
+                for (var i = 0; i < names.Length; i++)
+                {
+                    var columnMetadata = new ColumnMetadata();
+                    columnMetadata.name = names[i];
+                    columnMetadata.type = TypeName(columnTypes[i]);
+                    var fi = tableType.GetField(columnMetadata.name, BindingFlags.Public | BindingFlags.Instance);
+                    var fka = fi.GetCustomAttribute<ForeignKeyAttribute>();
+                    if (fka != null)
+                    {
+                        columnMetadata.foreignTable = TypeName(fka.relatedType);
+                    }
+
+                    var u = fi.GetCustomAttribute<UniqueAttribute>();
+                    if(u != null)
+                    {
+                        columnMetadata.isUnique = true;
+                    }
+                    tableMetaData.columns.Add(columnMetadata);
+                }
+                
+            }
+
+            return metadata;
+        }
+
         public static Table<T> CreateTable<T>(string primaryKeyFieldName = "id") where T:struct
         {
             if(tables.TryGetValue(typeof(T), out var existingTable))
@@ -21,6 +73,11 @@ namespace Tables
             SetupTableConstraints(table);
         
             return table;
+        }
+
+        public static IEnumerable<Type> GetTypes() 
+        {
+            foreach (var i in tables.Keys) yield return i;
         }
 
         public static Table<T> GetTable<T>() where T:struct => (Table<T>)tables[typeof(T)];
