@@ -11,17 +11,17 @@ public struct Employee
 {
     public int id;
     public string name;
-    [ForeignKey(typeof(Department), CascadeOperation.Delete, isNullable:true)] public int? department_id;
+    [ForeignKey("Deparment", "Staff", typeof(Department), CascadeOperation.Delete)] public int? department_id;
     public int? version;
-    [ForeignKey(typeof(Employee), CascadeOperation.SetNull, isNullable:true)] public int? manager_id;
+    [ForeignKey("Manager", "Subordinates", typeof(Employee), CascadeOperation.SetNull)] public int? manager_id;
     public float salary;
 }
 
 public struct Department
 {
     public int id;
-    [ForeignKey(typeof(Location), CascadeOperation.None, isNullable:true)]
-    public int? location_id;
+    [ForeignKey("Location", "Departments", typeof(Location), CascadeOperation.None)]
+    public int location_id;
     public string name;
 }
 
@@ -101,7 +101,8 @@ public class MoreComplexTests
     [Test]
     public void FKDeleteDeleteTest()
     {
-        var d = dept.Add(new Department() {name = "D"});
+        var location = this.location.Add(new Location() {name = "Here"});
+        var d = dept.Add(new Department() {name = "D", location_id = location.id});
         var s = emp.Add(new Employee() {name = "S", department_id = d.id});
         
         dept.Delete(d.id);
@@ -181,15 +182,18 @@ public class MoreComplexTests
     [Test]
     public void MultiRollbackTest()
     {
+        Begin();
+        var location = this.location.Add(new Location() {name = "Here"});
+        Commit();
         var emp1 = emp.Add(new Employee() {id = 0, name = "Simon"});
-        var dept1 = dept.Add(new Department() {id = 1, name = "Sales"});
+        var dept1 = dept.Add(new Department() {id = 1, name = "Sales", location_id = location.id});
         Assert.Throws<Exception>(() =>
         {
             Begin();
         });
         Rollback();
         Begin();
-        dept1 = dept.Add(new Department() {id = 1, name = "Sales"});
+        dept1 = dept.Add(new Department() {id = 1, name = "Sales", location_id = location.id});
         emp1 = emp.Add(new Employee() {id = 0, name = "Simon", department_id = 1});
         Commit();
         Assert.AreEqual(1, emp.RowCount);

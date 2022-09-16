@@ -46,6 +46,8 @@ namespace Tables
                     var fka = fi.GetCustomAttribute<ForeignKeyAttribute>();
                     if (fka != null)
                     {
+                        columnMetadata.relationshipName = fka.relationshipName;
+                        columnMetadata.inverseRelationshipName = fka.inverseRelationshipName;
                         columnMetadata.foreignTable = TypeName(fka.relatedType);
                     }
 
@@ -134,7 +136,7 @@ namespace Tables
                     var foreignKeyFieldName = fi.Name;
                     var foreignTableType = fka.relatedType;
                     var cascadeOperation = fka.cascadeOperation;
-                    table.AddRelationshipConstraint(foreignKeyFieldName, GetTable(foreignTableType), cascadeOperation, fka.isNullable);
+                    table.AddRelationshipConstraint(foreignKeyFieldName, GetTable(foreignTableType), cascadeOperation);
                 }
                 var ua = fi.GetCustomAttribute<UniqueAttribute>();
                 if (ua != null)

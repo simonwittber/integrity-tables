@@ -16,7 +16,7 @@ public struct Statistics
 {
     public int id;
 
-    [Unique][ForeignKey(typeof(Hero), CascadeOperation.Delete, isNullable:false)]
+    [Unique][ForeignKey("Hero", "Stats", typeof(Hero), CascadeOperation.Delete)]
     public int? hero_id;
 
     public float hitPoints;
@@ -29,10 +29,10 @@ public struct Friends
 {
     public int id;
     
-    [Unique("hero_pair")][ForeignKey(typeof(Hero), CascadeOperation.Delete, isNullable:false)]
+    [Unique("hero_pair")][ForeignKey("Hero", "Friends", typeof(Hero), CascadeOperation.Delete)]
     public int? hero_id;
 
-    [Unique("hero_pair"), ForeignKey(typeof(Hero), CascadeOperation.Delete, isNullable: false)]
+    [Unique("hero_pair"), ForeignKey("Hero", "Friends", typeof(Hero), CascadeOperation.Delete)]
     public int? other_hero_id;
 }
 

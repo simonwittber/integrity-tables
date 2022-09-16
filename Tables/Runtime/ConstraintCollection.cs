@@ -28,16 +28,45 @@ internal class ConstraintCollection<T> where T : struct
         }
     }
 
-    public void AddRelationship(ForeignKeyGetterDelegate<T> getForeignKeyFn, ForeignKeySetterDelegate<T> setForeignKeyFn, ITable foreignTable, CascadeOperation cascadeOperation, bool isNullable)
+    
+    public void AddWeakRelationship(WeakKeyGetterDelegate<T> getWeakKeyFn, WeakKeySetterDelegate<T> setWeakKeyFn, ITable foreignTable, CascadeOperation cascadeOperation)
+    {
+        var constraintName = $"fk:{typeof(T).Name}=>{foreignTable.Name}";
+        Add(TriggerType.OnUpdate, constraintName, row =>
+        {
+            var fk = getWeakKeyFn(row);
+            if (!fk.HasValue) return true;
+            return foreignTable.ContainsKey(fk.Value);
+        });
+
+        switch (cascadeOperation)
+        {
+            case CascadeOperation.Delete:
+                foreignTable.BeforeDelete += fk => { table.Delete(i => getWeakKeyFn(i) == fk); };
+                break;
+            case CascadeOperation.SetNull:
+                foreignTable.BeforeDelete += fk => { table.Update(i => setWeakKeyFn(i, null), i => getWeakKeyFn(i) == fk); };
+                break;
+            case CascadeOperation.None:
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(cascadeOperation), cascadeOperation, null);
+        }
+
+        foreignTable.BeforeDelete += fk =>
+        {
+            if (table.IsTrue(row => getWeakKeyFn(row) == fk))
+                throw new ConstraintException($"{typeof(T)}_fk");
+        };
+    }
+    
+    public void AddStrongRelationship(StrongKeyGetterDelegate<T> getForeignKeyFn, StrongKeySetterDelegate<T> setForeignKeyFn, ITable foreignTable, CascadeOperation cascadeOperation)
     {
         var constraintName = $"fk:{typeof(T).Name}=>{foreignTable.Name}";
         Add(TriggerType.OnUpdate, constraintName, row =>
         {
             var fk = getForeignKeyFn(row);
-            if (!isNullable && !fk.HasValue)
-                return false;
-            if (!fk.HasValue) return true;
-            return foreignTable.ContainsKey(fk.Value);
+            return foreignTable.ContainsKey(fk);
         });
 
         switch (cascadeOperation)
@@ -46,7 +75,7 @@ internal class ConstraintCollection<T> where T : struct
                 foreignTable.BeforeDelete += fk => { table.Delete(i => getForeignKeyFn(i) == fk); };
                 break;
             case CascadeOperation.SetNull:
-                foreignTable.BeforeDelete += fk => { table.Update(i => setForeignKeyFn(i, null), i => getForeignKeyFn(i) == fk); };
+                throw new InvalidOperationException("Cannot set a strong relationship to null.");
                 break;
             case CascadeOperation.None:
                 break;
@@ -61,13 +90,19 @@ internal class ConstraintCollection<T> where T : struct
         };
     }
 
-    public void AddRelationship(string fieldName, ITable foreignTable, CascadeOperation cascadeOperation, bool isNullable)
+    public void AddRelationship(string fieldName, ITable foreignTable, CascadeOperation cascadeOperation)
     {
         var fi = typeof(T).GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
-        if (fi.FieldType != typeof(int?))
-            throw new Exception("Foreign key fields must be of type 'int?'");
-        var getSet = Database.GetSetCompiler.Create<T, int?>(fieldName);
-        AddRelationship(getSet.Get, getSet.Set, foreignTable, cascadeOperation, isNullable);
+        if (fi.FieldType == typeof(int?))
+        {
+            var getSet = Database.GetSetCompiler.Create<T, int?>(fieldName);
+            AddWeakRelationship(getSet.Get, getSet.Set, foreignTable, cascadeOperation);
+        }
+        else if (fi.FieldType == typeof(int))
+        {
+            var getSet = Database.GetSetCompiler.Create<T, int>(fieldName);
+            AddStrongRelationship(getSet.Get, getSet.Set, foreignTable, cascadeOperation);
+        }
     }
 }
 

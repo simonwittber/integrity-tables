@@ -51,8 +51,8 @@ public class RelationalDataTests
         dept = CreateTable<Dept>();
 
         emp = CreateTable<Emp>();
-        emp.AddRelationshipConstraint("manager_id", emp, CascadeOperation.SetNull, true);
-        emp.AddRelationshipConstraint("department_id", dept, CascadeOperation.Delete, true);
+        emp.AddRelationshipConstraint("manager_id", emp, CascadeOperation.SetNull);
+        emp.AddRelationshipConstraint("department_id", dept, CascadeOperation.Delete);
     }
 
     [Test]

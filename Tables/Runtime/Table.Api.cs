@@ -244,9 +244,9 @@ public partial class Table<T>
         _index.AddConstraint(indexName, fieldNames);
     }
 
-    public void AddRelationshipConstraint(string foreignKeyFieldName, ITable table, CascadeOperation cascadeOperation, bool isNullable)
+    public void AddRelationshipConstraint(string foreignKeyFieldName, ITable table, CascadeOperation cascadeOperation)
     {
-        _constraints.AddRelationship(foreignKeyFieldName, table, cascadeOperation, isNullable);
+        _constraints.AddRelationship(foreignKeyFieldName, table, cascadeOperation);
     }
 
     IEnumerator IEnumerable.GetEnumerator()
