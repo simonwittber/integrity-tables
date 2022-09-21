@@ -8,10 +8,16 @@ public partial class Table<T>
         {
             throw new Exception("Cannot start a transaction on a dirty table.");
         }
+        _uniqueIndex.Begin();
     }
 
+    private List<T> pendingAdd = new();
+    private List<(T data, T oldData)> pendingUpdate = new();
+    private List<T> pendingDelete = new();
+    
     public void Commit()
     {
+        pendingAdd.Clear();
         for (var i = 0; i < _newRows.Count; i++)
         {
             var pk = _newRows[i];
@@ -19,20 +25,22 @@ public partial class Table<T>
             var row = _rows[index];
             row.committed = true;
             _rows[index] = row;
+            pendingAdd.Add(row.data);
         }
-
         _newRows.Clear();
 
-        foreach (var pk in _modifiedRows.Keys)
+        pendingUpdate.Clear();
+        foreach (var (pk,oldData) in _modifiedRows)
         {
             var index = _pkIndex[pk];
             var row = _rows[index];
             row.committed = true;
             _rows[index] = row;
+            pendingUpdate.Add((row.data, oldData));
         }
-
         _modifiedRows.Clear();
 
+        pendingDelete.Clear();
         foreach (var (pk, item) in _deletedRows)
         {
             var index = _pkIndex[pk];
@@ -42,9 +50,18 @@ public partial class Table<T>
             _pkIndex[GetPrimaryKey(lastRow.data)] = index;
             _rows.RemoveAt(lastIndex);
             _pkIndex.Remove(pk);
+            pendingDelete.Add(item);
         }
-
         _deletedRows.Clear();
+        
+        _uniqueIndex.Commit();
+        
+        foreach(var row in pendingAdd)
+            AfterAdd?.Invoke(row);
+        foreach(var (newRow, oldRow) in pendingUpdate)
+            AfterUpdate?.Invoke(oldRow, newRow);
+        foreach(var deadRow in pendingDelete)
+            AfterDelete?.Invoke(deadRow);
     }
 
     public void Rollback()
@@ -63,11 +80,11 @@ public partial class Table<T>
 
         _newRows.Clear();
 
-        foreach (var (pk, data) in _modifiedRows)
+        foreach (var (pk, oldData) in _modifiedRows)
         {
             var index = _pkIndex[pk];
             var row = _rows[index];
-            row.data = data;
+            row.data = oldData;
             _rows[index] = row;
         }
 
@@ -84,6 +101,8 @@ public partial class Table<T>
         }
 
         _deletedRows.Clear();
+        
+        _uniqueIndex.Rollback();
     }
 
     

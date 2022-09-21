@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
+using System.Diagnostics;
 using NUnit.Framework;
 using Tables;
 using static Tables.Database;
@@ -39,15 +41,17 @@ public class MoreComplexTests
     private Table<Employee> emp;
     private Table<Department> dept;
     private Table<Location> location;
+    private Database db;
 
     [SetUp]
     public void Setup()
     {
-        DropDatabase();
-        CreateTable<Location>();
-        dept = CreateTable<Department>("id");
-        emp = CreateTable<Employee>("id");
-        location = CreateTable<Location>();
+        db = new Database();
+        db.DropDatabase();
+        db.CreateTable<Location>();
+        dept = db.CreateTable<Department>("id");
+        emp = db.CreateTable<Employee>("id");
+        location = db.CreateTable<Location>();
     }
 
     [Test]
@@ -56,22 +60,30 @@ public class MoreComplexTests
         var fired = false;
         emp.When(employee => employee.salary > 1000, item =>
         {
+            System.Console.WriteLine("When");
             fired = true;
         });
         Assert.IsFalse(fired);
         emp.Add(new Employee() {salary = 999});
+        emp.Commit();
         Assert.IsFalse(fired);
         var e = emp.Add(new Employee() {salary = 9999});
+        emp.Commit();
         Assert.IsTrue(fired);
         fired = false;
         e.salary = 999999;
         emp.Update(e);
+        emp.Commit();
         Assert.IsFalse(fired);
         e.salary = 999;
         emp.Update(e);
+        db.Commit();
+        
         Assert.IsFalse(fired);
         e.salary = 999999;
         emp.Update(e);
+        db.Commit();
+        
         Assert.IsTrue(fired);
     }
 
@@ -93,6 +105,7 @@ public class MoreComplexTests
         var s = emp.Add(new Employee() {name = "S"});
         var c1 = emp.Add(new Employee() {manager_id = s.id, name = "C1"});
         Assert.IsNotNull(c1.manager_id);
+        emp.Commit();
         emp.Delete(s.id);
         c1 = emp.Get(c1.id);
         Assert.IsNull(c1.manager_id);
@@ -108,7 +121,7 @@ public class MoreComplexTests
         dept.Delete(d.id);
         
         Assert.Throws<KeyNotFoundException>(() => emp.Get(s.id));
-        Commit();
+        db.Commit();
         Assert.Throws<KeyNotFoundException>(() => emp.Get(s.id));
     }
 
@@ -182,20 +195,20 @@ public class MoreComplexTests
     [Test]
     public void MultiRollbackTest()
     {
-        Begin();
+        db.Begin();
         var location = this.location.Add(new Location() {name = "Here"});
-        Commit();
+        db.Commit();
         var emp1 = emp.Add(new Employee() {id = 0, name = "Simon"});
         var dept1 = dept.Add(new Department() {id = 1, name = "Sales", location_id = location.id});
         Assert.Throws<Exception>(() =>
         {
-            Begin();
+            db.Begin();
         });
-        Rollback();
-        Begin();
+        db.Rollback();
+        db.Begin();
         dept1 = dept.Add(new Department() {id = 1, name = "Sales", location_id = location.id});
         emp1 = emp.Add(new Employee() {id = 0, name = "Simon", department_id = 1});
-        Commit();
+        db.Commit();
         Assert.AreEqual(1, emp.RowCount);
         Assert.AreEqual(1, dept.RowCount);
     }
@@ -215,18 +228,18 @@ public class MoreComplexTests
             }
             return newItem;
         };
-        Begin();
+        db.Begin();
         var emp1 = emp.Add(new Employee() {id = 32, name = "Simon"});
-        Commit();
+        db.Commit();
         var item = emp.Get(emp1.id);
         Assert.IsFalse(item.version.HasValue);
-        Begin();
+        db.Begin();
         item.name = "Boris";
         var newItem = emp.Update(item);
         Assert.IsTrue(newItem.version.HasValue);
         Assert.AreEqual(1, newItem.version.Value);
         Assert.AreEqual("Boris", newItem.name);
-        Commit();
+        db.Commit();
         newItem.name = "Vlad";
         var anotherNewItem = emp.Update(newItem);
         Assert.AreEqual("Vlad", anotherNewItem.name);
@@ -246,6 +259,54 @@ public class MoreComplexTests
         Assert.DoesNotThrow(() =>
         {
             location.Add(new Location() {name = "X"});
+        });
+
+    }
+    
+    
+    [Test]
+    public void UniqueAddRollbackTest()
+    {
+        var row1 = location.Add(new Location() {name = "X"});
+        location.Rollback();
+        
+        Assert.DoesNotThrow(() =>
+        {
+            location.Add(new Location() {name = "X"});
+        });
+    }
+    
+    [Test]
+    public void UniqueUpdateRollbackTest()
+    {
+        var row1 = location.Add(new Location() {name = "X"});
+        location.Commit();
+        row1.name = "Y";
+        location.Update(row1);
+        
+        location.Rollback();
+        
+        Assert.DoesNotThrow(() =>
+        {
+            location.Add(new Location() {name = "Y"});
+        });
+
+    }
+    
+    
+    [Test]
+    public void UniqueUpdateRollbackCommitTest()
+    {
+        var row1 = location.Add(new Location() {name = "X"});
+        location.Commit();
+        row1.name = "Y";
+        location.Update(row1);
+        location.Rollback();
+        
+        Assert.Throws<ConstraintException>(() =>
+        {
+            location.Add(new Location() {name = "X"});
+            location.Commit();
         });
 
     }

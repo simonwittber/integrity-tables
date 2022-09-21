@@ -6,14 +6,6 @@ using static Tables.Database;
 
 namespace TestTables;
 
-public static class EmployeeExtensionMethods
-{
-    public static Department Deparment(this Employee e)
-    {
-        return Database.GetTable<Department>()[(int) e.department_id];
-    }
-}
-
 public class RelationalDataTests
 {
     
@@ -43,14 +35,16 @@ public class RelationalDataTests
     
     private Table<Emp> emp;
     private Table<Dept> dept;
+    private Database db;
 
     [SetUp]
     public void Setup()
     {
-        DropDatabase();
-        dept = CreateTable<Dept>();
+        db = new Database();
+        db.DropDatabase();
+        dept = db.CreateTable<Dept>();
 
-        emp = CreateTable<Emp>();
+        emp = db.CreateTable<Emp>();
         emp.AddRelationshipConstraint("manager_id", emp, CascadeOperation.SetNull);
         emp.AddRelationshipConstraint("department_id", dept, CascadeOperation.Delete);
     }
@@ -58,7 +52,7 @@ public class RelationalDataTests
     [Test]
     public void TestPKFn()
     {
-        Begin();
+        db.Begin();
         var e1 = emp.Add(new() {name = "Boris", salary = 1000});
         var e2 = emp.Add(new() {name = "Vlad", salary = 2000});
         var e3 = emp.Add(new() {name = "Simon", salary = 1000, manager_id = e1.id});
@@ -76,7 +70,7 @@ public class RelationalDataTests
         Assert.AreEqual("Simon", result.name);
         Assert.AreEqual(2, emp.Count(i=>i.salary<2000));
         Assert.IsTrue(emp.IsDirty);
-        Commit();
+        db.Commit();
         Assert.IsFalse(emp.IsDirty);
         var deletedCount = emp.Delete(i => i.salary < 2000);
         Assert.IsTrue(emp.IsDirty);
@@ -90,7 +84,7 @@ public class RelationalDataTests
         Assert.IsTrue(emp.IsDirty);
         emp.Apply(i => Console.WriteLine(i));
         Assert.AreEqual(0, emp.Count(i=>i.salary<2000));
-        Commit();
+        db.Commit();
         Assert.AreEqual(0, emp.Count(i=>i.salary<2000));
         
     }

@@ -44,24 +44,27 @@ public struct SomeInstance
 
 public class UniqueIndexTests
 {
+    private Database db;
+
     [SetUp]
     public void Setup()
     {
-        DropDatabase();
-        CreateTable<Hero>();
-        CreateTable<Statistics>();
-        CreateTable<Friends>();
+        db = new Database();
+        db.DropDatabase();
+        db.CreateTable<Hero>();
+        db.CreateTable<Statistics>();
+        db.CreateTable<Friends>();
 
     }
     
     [Test]
     public void TestInsertAndGet()
     {
-        var heroes = GetTable<Hero>();
-        var stats = GetTable<Statistics>();
-        var friends = GetTable<Friends>();
+        var heroes = db.GetTable<Hero>();
+        var stats = db.GetTable<Statistics>();
+        var friends = db.GetTable<Friends>();
         
-        Begin();
+        db.Begin();
         var a = heroes.Add(new Hero() {name = "A Type of Thing"});
         var b = stats.Add(new Statistics() {hero_id = a.id});
         var c = heroes.Add(new Hero() {name = "Another Type of Thing"});
@@ -83,6 +86,6 @@ public class UniqueIndexTests
             friends.Add(new Friends() {other_hero_id = a.id, hero_id = c.id});    
         });
         
-        Commit();
+        db.Commit();
     }
 }

@@ -1,13 +1,82 @@
+using System.Xml.Schema;
+
 namespace Tables;
 
 public partial class Index<T> where T : struct
 {
-    private readonly Dictionary<string, Dictionary<IndexKey, int>> _fieldIndexes = new();
+    private readonly Dictionary<string, DoubleMap<IndexKey, int>> _fieldMaps = new();
+    
     private readonly Table<T> _table;
+    
+
+    public void Begin()
+    {
+        foreach (var doubleMap in _fieldMaps.Values)
+        {
+            doubleMap.Begin();
+        }
+    }
+    
+    public void Commit()
+    {
+        foreach (var doubleMap in _fieldMaps.Values)
+        {
+            doubleMap.Commit();
+        }
+    }
+    
+    public void Rollback()
+    {
+        foreach (var doubleMap in _fieldMaps.Values)
+        {
+            doubleMap.Rollback();
+        }
+    }
 
     public Index(Table<T> table)
     {
         _table = table;
+        _table.BeforeAdd += BeforeAdd;
+        _table.BeforeUpdate += BeforeUpdate;
+        _table.BeforeDelete += BeforeDelete;
+    }
+
+    private void BeforeDelete(int pk)
+    {
+        foreach (var doubleMap in _fieldMaps.Values)
+        {
+            var item = _table.Get(pk); 
+            var indexKey = CreateIndexkey(doubleMap.fieldIndexes, item);
+            doubleMap.Remove(indexKey);
+        }
+    }
+
+    private T BeforeUpdate(T oldItem, T newItem)
+    {
+        foreach(var doubleMap in _fieldMaps.Values)
+        {
+            var indexKey = CreateIndexkey(doubleMap.fieldIndexes, newItem);
+            if (doubleMap.ContainsKey(indexKey)) 
+                throw new ConstraintException("Unique Index violation");
+            var pk = _table.GetPrimaryKey(newItem);
+            var oldIndexKey = CreateIndexkey(doubleMap.fieldIndexes, oldItem);
+            doubleMap.Remove(oldIndexKey);
+            doubleMap.Add(indexKey, pk);
+        }
+        return newItem;
+    }
+    
+    private T BeforeAdd(T item)
+    {
+        foreach (var doubleMap in _fieldMaps.Values)
+        {
+            var indexKey = CreateIndexkey(doubleMap.fieldIndexes, item);
+            if (doubleMap.ContainsKey(indexKey)) 
+                throw new ConstraintException("Unique Index violation");
+            var pk = _table.GetPrimaryKey(item);
+            doubleMap.Add(indexKey, pk);
+        }
+        return item;
     }
 
     public void AddConstraint(string indexName, params string[] uniqueFieldNames)
@@ -22,25 +91,12 @@ public partial class Index<T> where T : struct
             fieldIndexes[i] = fieldIndex;
         }
 
-        var idx = _fieldIndexes[indexName] = new Dictionary<IndexKey, int>();
-        _table.BeforeAdd += CheckFieldValueIsUnique(idx, fieldIndexes);
-        _table.AfterAdd += SaveUniqueFieldValue(idx, fieldIndexes);
-        _table.BeforeUpdate += CheckFieldValueIsStillUnique(idx, fieldIndexes);
-        _table.AfterUpdate += UpdateUniqueFieldValue(idx, fieldIndexes);
-        _table.AfterDelete += RemoveUniqueFieldValue(idx, fieldIndexes);
+        _fieldMaps[indexName] = new DoubleMap<IndexKey, int>(fieldIndexes);
+        // _table.BeforeAdd += BeforeAdd;//CheckFieldValueIsUnique(idx, fieldIndexes);
+        // _table.BeforeUpdate += CheckFieldValueIsStillUnique(idx, fieldIndexes);
+        // _table.BeforeDelete += RemoveUniqueFieldValue(idx, fieldIndexes);
     }
 
-    private BeforeUpdateDelegate<T> CheckFieldValueIsStillUnique(Dictionary<IndexKey, int> index, int[] fieldIndexes)
-    {
-        return (item, newItem) =>
-        {
-            var indexKey = CreateIndexkey(fieldIndexes, newItem);
-
-            if (index.ContainsKey(indexKey)) throw new ConstraintException("Unique Index violation");
-
-            return newItem;
-        };
-    }
 
     private IndexKey CreateIndexkey(int[] fieldIndexes, T item)
     {
@@ -54,45 +110,13 @@ public partial class Index<T> where T : struct
         return indexKey;
     }
 
-    private AfterDeleteDelegate<T> RemoveUniqueFieldValue(Dictionary<IndexKey, int> index, int[] fieldIndexes)
-    {
-        return item =>
-        {
-            var indexKey = CreateIndexkey(fieldIndexes, item);
-            index.Remove(indexKey);
-        };
-    }
 
-    private AfterUpdateDelegate<T> UpdateUniqueFieldValue(Dictionary<IndexKey, int> index, int[] fieldIndexes)
+    internal void Remove(int pk)
     {
-        return (item, newItem) =>
+        foreach (var doubleMap in _fieldMaps.Values)
         {
-            var pk = _table.GetPrimaryKey(newItem);
-
-            var oldIndexKey = CreateIndexkey(fieldIndexes, item);
-            index.Remove(oldIndexKey);
-            var newIndexKey = CreateIndexkey(fieldIndexes, newItem);
-            index.Add(newIndexKey, pk);
-        };
-    }
-
-    private AfterAddDelegate<T> SaveUniqueFieldValue(Dictionary<IndexKey, int> index, int[] fieldIndexes)
-    {
-        return item =>
-        {
-            var indexKey = CreateIndexkey(fieldIndexes, item);
-            var pk = _table.GetPrimaryKey(item);
-            index.Add(indexKey, pk);
-        };
-    }
-
-    private BeforeAddDelegate<T> CheckFieldValueIsUnique(Dictionary<IndexKey, int> index, int[] fieldIndexes)
-    {
-        return item =>
-        {
-            var indexKey = CreateIndexkey(fieldIndexes, item);
-            if (index.ContainsKey(indexKey)) throw new ConstraintException("Unique Index violation");
-            return item;
-        };
+            doubleMap.Remove(pk);
+        }
+        
     }
 }

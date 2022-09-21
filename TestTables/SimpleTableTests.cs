@@ -28,7 +28,8 @@ public class SimpleTableTests
     [Test]
     public void TestInsertAndGet()
     {
-        var table = CreateTable<TestRow>("id");
+        var db = new Database();
+        var table = db.CreateTable<TestRow>("id");
         table.AddConstraint(TriggerType.OnUpdate,"Name Not Null", i => i.name != null);
         var row = table.Add(new TestRow() { name = "srw" });
         table.Commit();

@@ -13,7 +13,7 @@ public partial class Table<T>
         _pkIndex.Add(pk, index);
         _rows.Add(new Row<T>() {data = data, committed = false, deleted = false});
         _newRows.Add(pk);
-        if (AfterAdd != null) AfterAdd(data);
+        //if (AfterAdd != null) AfterAdd(data);
         return data;
     }
 
@@ -22,15 +22,17 @@ public partial class Table<T>
         var pk = GetPrimaryKey(newData);
         var index = _pkIndex[pk];
         var currentRow = GetRow(index);
-        var rollbackData = currentRow.data;
-        if (BeforeUpdate != null) newData = BeforeUpdate(rollbackData, newData);
+        if (!currentRow.committed || currentRow.deleted)
+            throw new ConstraintException("Row has not been committed, cannot modify it.");
+        var oldData = currentRow.data;
+        if (BeforeUpdate != null) newData = BeforeUpdate(oldData, newData);
         _constraints.CheckConstraintsForItem(TriggerType.OnUpdate, newData);
         currentRow.data = newData;
         currentRow.committed = false;
         SetRow(index, currentRow);
         //Add the old data in case of rollback. Consecutive updates will be ignored.
-        _modifiedRows.TryAdd(pk, rollbackData);
-        if (AfterUpdate != null) AfterUpdate(rollbackData, newData);
+        _modifiedRows.TryAdd(pk, oldData);
+        //if (AfterUpdate != null) AfterUpdate(oldData, newData);
         return newData;
     }
 
@@ -44,6 +46,6 @@ public partial class Table<T>
         var row = _rows[index];
         row.deleted = true;
         _rows[index] = row;
-        AfterDelete?.Invoke(data);
+        //AfterDelete?.Invoke(data);
     }
 }

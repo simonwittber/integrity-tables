@@ -3,14 +3,14 @@ using GetSetGenerator;
 
 namespace Tables
 {
-    public static class Database
+    public class Database
     {
-        private static Dictionary<Type, ITable> tables = new();
+        private Dictionary<Type, ITable> tables = new();
         
         public static readonly GetSetCompiler GetSetCompiler = new GetSetCompiler();
         public static readonly ExtensionCompiler IndexerCompiler = new ExtensionCompiler();
 
-        public static DatabaseMetadata GetMetadata()
+        public DatabaseMetadata GetMetadata()
         {
             string TypeName(Type t)
             {
@@ -47,7 +47,18 @@ namespace Tables
                     if (fka != null)
                     {
                         columnMetadata.relationshipName = fka.relationshipName;
-                        columnMetadata.inverseRelationshipName = fka.inverseRelationshipName;
+                        if (string.IsNullOrEmpty(fka.inverseRelationshipName))
+                        {
+                            var cna = tableType.GetCustomAttribute<CollectionNameAttribute>();
+                            if (cna == null)
+                                columnMetadata.inverseRelationshipName = $"{tableType.Name}Collection";
+                            else
+                                columnMetadata.inverseRelationshipName = cna.collectionName;
+                        }
+                        else
+                        {
+                            columnMetadata.inverseRelationshipName = fka.inverseRelationshipName;
+                        }
                         columnMetadata.foreignTable = TypeName(fka.relatedType);
                     }
 
@@ -64,7 +75,7 @@ namespace Tables
             return metadata;
         }
 
-        public static Table<T> CreateTable<T>(string primaryKeyFieldName = "id") where T:struct
+        public Table<T> CreateTable<T>(string primaryKeyFieldName = "id") where T:struct
         {
             if(tables.TryGetValue(typeof(T), out var existingTable))
                 return existingTable as Table<T>;
@@ -77,55 +88,55 @@ namespace Tables
             return table;
         }
 
-        public static IEnumerable<Type> GetTypes() 
+        public IEnumerable<Type> GetTypes() 
         {
             foreach (var i in tables.Keys) yield return i;
         }
 
-        public static Table<T> GetTable<T>() where T:struct => (Table<T>)tables[typeof(T)];
+        public Table<T> GetTable<T>() where T:struct => (Table<T>)tables[typeof(T)];
         
-        public static ITable GetTable(Type rowType) => tables[rowType];
+        public ITable GetTable(Type rowType) => tables[rowType];
         
 
-        public static void DropDatabase()
+        public void DropDatabase()
         {
             tables.Clear();
         }
 
-        public static void Begin()
+        public void Begin()
         {
             foreach (var table in tables.Values) table.Begin();
         }
 
-        public static void Commit()
+        public void Commit()
         {
             foreach (var table in tables.Values) table.Commit();
         }
 
-        public static void Rollback()
+        public void Rollback()
         {
             foreach (var table in tables.Values) table.Rollback();
         }
 
-        public static ITable[] Tables => tables.Values.ToArray();
+        public ITable[] Tables => tables.Values.ToArray();
         
         
-        public static T Q<T>(int? id) where T : struct
+        public T Q<T>(int? id) where T : struct
         {
             return GetTable<T>().Get(id);
         }
 
-        public static Table<T> Q<T>() where T : struct
+        public Table<T> Q<T>() where T : struct
         {
             return GetTable<T>();
         }
         
-        public static IEnumerable<T> Q<T>(Predicate<T> predicate) where T : struct
+        public IEnumerable<T> Q<T>(Predicate<T> predicate) where T : struct
         {
             return Q<T>().Select(predicate);
         }
 
-        private static void SetupTableConstraints<T>(Table<T> table) where T : struct
+        private void SetupTableConstraints<T>(Table<T> table) where T : struct
         {
             var uniqueConstraints = new Dictionary<string, List<string>>();
             foreach (var fi in typeof(T).GetFields(BindingFlags.Public | BindingFlags.Instance))
