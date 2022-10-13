@@ -1,7 +1,7 @@
 using System.Reflection;
 using GetSetGenerator;
 
-namespace Tables
+namespace IntegrityTables
 {
     public class Database
     {

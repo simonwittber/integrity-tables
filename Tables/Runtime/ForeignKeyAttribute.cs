@@ -1,4 +1,4 @@
-namespace Tables;
+namespace IntegrityTables;
 
 [AttributeUsage(AttributeTargets.Field)]
 public class ForeignKeyAttribute : System.Attribute

@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Diagnostics;
 using NUnit.Framework;
-using Tables;
-using static Tables.Database;
-using ConstraintException = Tables.ConstraintException;
+using IntegrityTables;
+using static IntegrityTables.Database;
 
 namespace TestTables;
 
@@ -36,8 +35,6 @@ public struct Location
 
 public class MoreComplexTests
 {
-    
-
     private Table<Employee> emp;
     private Table<Department> dept;
     private Table<Location> location;
@@ -93,7 +90,7 @@ public class MoreComplexTests
         var s = emp.Add(new Employee() {name = "S"});
         var c1 = emp.Add(new Employee() {manager_id = s.id, name = "C1"});
         
-        Assert.Throws<ConstraintException>(() =>
+        Assert.Throws<IntegrityException>(() =>
         {
             var c2 = emp.Add(new Employee() {manager_id = 78, name = "C2"});
         });
@@ -251,7 +248,7 @@ public class MoreComplexTests
     {
         var row1 = location.Add(new Location() {name = "X"});
         location.Add(new Location() {name = "Y"});
-        Assert.Throws<ConstraintException>(() =>
+        Assert.Throws<IntegrityException>(() =>
         {
             location.Add(new Location() {name = "X"});
         });
@@ -303,7 +300,7 @@ public class MoreComplexTests
         location.Update(row1);
         location.Rollback();
         
-        Assert.Throws<ConstraintException>(() =>
+        Assert.Throws<IntegrityException>(() =>
         {
             location.Add(new Location() {name = "X"});
             location.Commit();

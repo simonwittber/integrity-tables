@@ -3,8 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using NUnit.Framework;
-using Tables;
-using static Tables.Database;
+using IntegrityTables;
+using static IntegrityTables.Database;
 
 namespace TestTables;
 

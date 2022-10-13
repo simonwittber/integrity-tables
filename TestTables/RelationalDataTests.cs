@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using Tables;
-using static Tables.Database;
+using IntegrityTables;
+using static IntegrityTables.Database;
 
 namespace TestTables;
 
@@ -56,7 +56,7 @@ public class RelationalDataTests
         var e1 = emp.Add(new() {name = "Boris", salary = 1000});
         var e2 = emp.Add(new() {name = "Vlad", salary = 2000});
         var e3 = emp.Add(new() {name = "Simon", salary = 1000, manager_id = e1.id});
-        Assert.Throws<ConstraintException>(() =>
+        Assert.Throws<IntegrityException>(() =>
         {
             var e4 = emp.Add(new() {name = "Slobodan", salary = 1000, manager_id = e1.id, department_id = 322});
         });

@@ -1,6 +1,6 @@
 ﻿using System.Collections;
 
-namespace Tables
+namespace IntegrityTables
 {
 
     public interface ITable : IEnumerable

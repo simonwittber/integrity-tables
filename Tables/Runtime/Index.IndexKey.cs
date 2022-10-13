@@ -1,17 +1,22 @@
-﻿namespace Tables;
+﻿namespace IntegrityTables;
 
-public partial class Index<T>
+internal partial class UniqueIndex<T>
 {
-    private struct IndexKey : IEquatable<IndexKey>
+    /// <summary>
+    /// This type is used to create a Dictionary key using up to 4 arbitrary objects.
+    /// </summary>
+    private struct MultiFieldKey : IEquatable<MultiFieldKey>
     {
-        public bool Equals(IndexKey other)
+        object a, b, c, d;
+        
+        public bool Equals(MultiFieldKey other)
         {
             return Equals(a, other.a) && Equals(b, other.b) && Equals(c, other.c) && Equals(d, other.d);
         }
 
         public override bool Equals(object obj)
         {
-            return obj is IndexKey other && Equals(other);
+            return obj is MultiFieldKey other && Equals(other);
         }
 
         public override int GetHashCode()
@@ -19,18 +24,16 @@ public partial class Index<T>
             return HashCode.Combine(a, b, c, d);
         }
 
-        public static bool operator ==(IndexKey left, IndexKey right)
+        public static bool operator ==(MultiFieldKey left, MultiFieldKey right)
         {
             return left.Equals(right);
         }
 
-        public static bool operator !=(IndexKey left, IndexKey right)
+        public static bool operator !=(MultiFieldKey left, MultiFieldKey right)
         {
             return !left.Equals(right);
         }
-
-        object a, b, c, d;
-
+        
         public void SetValue(int size, object v)
         {
             switch (size)

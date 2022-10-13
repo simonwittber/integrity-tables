@@ -1,6 +1,6 @@
-namespace Tables;
+namespace IntegrityTables;
 
-internal class DoubleMap<T1, T2>
+internal class BiMap<T1, T2>
 {
     public int[] fieldIndexes;
     
@@ -10,7 +10,7 @@ internal class DoubleMap<T1, T2>
     private List<(T1, T2)> _deleted = new();
     private List<(T1, T2)> _added = new();
 
-    public DoubleMap(int[] fieldIndexes)
+    public BiMap(int[] fieldIndexes)
     {
         this.fieldIndexes = fieldIndexes;
     }
@@ -66,5 +66,13 @@ internal class DoubleMap<T1, T2>
     {
         if (_added.Count > 0 || _deleted.Count > 0)
             throw new System.Exception("Index has not been committed or rolled back.");
+    }
+
+    public bool TryGet(T1 keyA, out T2 keyB)
+    {
+        keyB = default;
+        if (mapA.TryGetValue(keyA, out keyB))
+            return true;
+        return false;
     }
 }

@@ -1,7 +1,7 @@
 using System.Buffers;
 using NUnit.Framework;
-using Tables;
-using static Tables.Database;
+using IntegrityTables;
+using static IntegrityTables.Database;
 
 namespace TestTables;
 
@@ -56,7 +56,23 @@ public class UniqueIndexTests
         db.CreateTable<Friends>();
 
     }
-    
+
+    [Test]
+    public void TestModifyToUnUnique()
+    {
+        var heroes = db.GetTable<Hero>();
+        db.Begin();
+        var a = heroes.Add(new Hero() {name = "X"});
+        var b = heroes.Add(new Hero() {name = "Y"});
+        db.Commit();
+        Assert.Throws<IntegrityException>(() =>
+        {
+            b.name = "X";
+            heroes.Update(b);
+        });
+        db.Commit();
+    }
+
     [Test]
     public void TestInsertAndGet()
     {
@@ -68,16 +84,16 @@ public class UniqueIndexTests
         var a = heroes.Add(new Hero() {name = "A Type of Thing"});
         var b = stats.Add(new Statistics() {hero_id = a.id});
         var c = heroes.Add(new Hero() {name = "Another Type of Thing"});
-        Assert.Throws<ConstraintException>(() =>
+        Assert.Throws<IntegrityException>(() =>
         {
             heroes.Add(new Hero() {name = "A Type of Thing"});
         });
-        Assert.Throws<ConstraintException>(() =>
+        Assert.Throws<IntegrityException>(() =>
         {
             stats.Add(new Statistics() {hero_id = a.id});
         });
         friends.Add(new Friends() {hero_id = a.id, other_hero_id = c.id});
-        Assert.Throws<ConstraintException>(() =>
+        Assert.Throws<IntegrityException>(() =>
         {
             friends.Add(new Friends() {hero_id = a.id, other_hero_id = c.id});
         });

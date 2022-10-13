@@ -1,4 +1,4 @@
-namespace Tables 
+namespace IntegrityTables 
 {
     public delegate T BeforeAddDelegate<T>(T item);
     public delegate void AfterAddDelegate<T>(T item);

@@ -1,4 +1,4 @@
-namespace Tables;
+namespace IntegrityTables;
 
 public partial class Table<T>
 {
@@ -42,7 +42,7 @@ public partial class Table<T>
         {
             var newData = value;
             var pk = GetPrimaryKey(newData);
-            if (pk != id) throw new ConstraintException("Cannot change a primary key.");
+            if (pk != id) throw new IntegrityException("Cannot change a primary key.");
             Update(newData);
         }
     }

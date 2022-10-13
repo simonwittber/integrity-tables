@@ -1,4 +1,4 @@
-namespace Tables;
+namespace IntegrityTables;
 
 [AttributeUsage(AttributeTargets.Struct)]
 public class CollectionNameAttribute : System.Attribute

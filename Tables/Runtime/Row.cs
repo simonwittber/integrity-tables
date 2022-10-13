@@ -1,4 +1,4 @@
-namespace Tables
+namespace IntegrityTables
 {
 
     internal struct Row<T>

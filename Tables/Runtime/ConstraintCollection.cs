@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace Tables;
+namespace IntegrityTables;
 
 internal class ConstraintCollection<T> where T : struct
 {
@@ -24,7 +24,7 @@ internal class ConstraintCollection<T> where T : struct
         {
             var (type, constraintName, constraintFn) = _constraints[i];
             if (type == triggerType && !constraintFn.Invoke(item))
-                throw new ConstraintException(constraintName);
+                throw new IntegrityException(constraintName);
         }
     }
 
@@ -56,7 +56,7 @@ internal class ConstraintCollection<T> where T : struct
         foreignTable.BeforeDelete += fk =>
         {
             if (table.IsTrue(row => getWeakKeyFn(row) == fk))
-                throw new ConstraintException($"{typeof(T)}_fk");
+                throw new IntegrityException($"{typeof(T)}_fk");
         };
     }
     
@@ -86,7 +86,7 @@ internal class ConstraintCollection<T> where T : struct
         foreignTable.BeforeDelete += fk =>
         {
             if (table.IsTrue(row => getForeignKeyFn(row) == fk))
-                throw new ConstraintException($"{typeof(T)}_fk");
+                throw new IntegrityException($"{typeof(T)}_fk");
         };
     }
 

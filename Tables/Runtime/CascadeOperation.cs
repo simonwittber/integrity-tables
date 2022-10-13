@@ -1,4 +1,4 @@
-namespace Tables
+namespace IntegrityTables
 {
 
     public enum CascadeOperation

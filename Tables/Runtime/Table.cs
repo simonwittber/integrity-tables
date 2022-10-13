@@ -1,6 +1,6 @@
 ﻿using GetSetGenerator;
 
-namespace Tables
+namespace IntegrityTables
 {
     public partial class Table<T> : ITable, IEnumerable<T> where T:struct
     {
@@ -16,7 +16,7 @@ namespace Tables
         
         private readonly List<Row<T>> _rows = new();
 
-        private readonly Index<T> _uniqueIndex;
+        private readonly UniqueIndex<T> _uniqueIndex;
         private readonly ConstraintCollection<T> _constraints;
 
         private int _idCount = 0;
@@ -27,7 +27,7 @@ namespace Tables
             _fieldIndexer = fieldIndexer;
             GetPrimaryKey = getPrimaryKey;
             SetPrimaryKey = setPrimaryKey;
-            _uniqueIndex = new Index<T>(this);
+            _uniqueIndex = new UniqueIndex<T>(this);
             _constraints = new ConstraintCollection<T>(this);
         }
 

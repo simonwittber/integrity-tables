@@ -1,4 +1,4 @@
-namespace Tables;
+namespace IntegrityTables;
 
 [Serializable]
 public class TableMetadata
