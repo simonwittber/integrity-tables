@@ -18,24 +18,29 @@ internal class ConstraintCollection<T> where T : struct
         _constraints.Add((triggerType, constraintName, constraintFn));
     }
 
-    internal void CheckConstraintsForItem(TriggerType triggerType, T item)
+    internal void CheckConstraintsForItem(TriggerType triggerType, T oldItem, T newItem)
     {
         for (var i = 0; i < _constraints.Count; i++)
         {
             var (type, constraintName, constraintFn) = _constraints[i];
-            if (type == triggerType && !constraintFn.Invoke(item))
+            if (type == triggerType && !constraintFn.Invoke(oldItem, newItem))
                 throw new IntegrityException(constraintName);
         }
     }
-
     
+    internal void CheckConstraintsForItem(TriggerType triggerType, T item)
+    {
+        CheckConstraintsForItem(triggerType, item, item);
+    }
+
     public void AddWeakRelationship(WeakKeyGetterDelegate<T> getWeakKeyFn, WeakKeySetterDelegate<T> setWeakKeyFn, ITable foreignTable, CascadeOperation cascadeOperation)
     {
         var constraintName = $"fk:{typeof(T).Name}=>{foreignTable.Name}";
-        Add(TriggerType.OnUpdate, constraintName, row =>
+        Add(TriggerType.OnUpdate, constraintName, (oldRow, newRow) =>
         {
-            var fk = getWeakKeyFn(row);
+            var fk = getWeakKeyFn(newRow);
             if (!fk.HasValue) return true;
+            
             return foreignTable.ContainsKey(fk.Value);
         });
 
@@ -63,9 +68,10 @@ internal class ConstraintCollection<T> where T : struct
     public void AddStrongRelationship(StrongKeyGetterDelegate<T> getForeignKeyFn, StrongKeySetterDelegate<T> setForeignKeyFn, ITable foreignTable, CascadeOperation cascadeOperation)
     {
         var constraintName = $"fk:{typeof(T).Name}=>{foreignTable.Name}";
-        Add(TriggerType.OnUpdate, constraintName, row =>
+        Add(TriggerType.OnUpdate, constraintName, (oldRow, newRow) =>
         {
-            var fk = getForeignKeyFn(row);
+            var fk = getForeignKeyFn(newRow);
+            if (fk == getForeignKeyFn(oldRow)) return true;
             return foreignTable.ContainsKey(fk);
         });
 
@@ -104,5 +110,6 @@ internal class ConstraintCollection<T> where T : struct
             AddStrongRelationship(getSet.Get, getSet.Set, foreignTable, cascadeOperation);
         }
     }
+    
 }
 

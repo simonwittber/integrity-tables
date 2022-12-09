@@ -236,7 +236,7 @@ public partial class Table<T>
     
     public void AddConstraint(TriggerType triggerType, string constraintName, ConstraintDelegate<T> constraintFn)
     {
-        _constraints.Add(triggerType, constraintName, constraintFn);
+        //_constraints.Add(triggerType, constraintName, constraintFn);
     }
 
     public void AddUniqueConstraint(string indexName, params string[] fieldNames)

@@ -30,7 +30,7 @@ public class SimpleTableTests
     {
         var db = new Database();
         var table = db.CreateTable<TestRow>("id");
-        table.AddConstraint(TriggerType.OnUpdate,"Name Not Null", i => i.name != null);
+        table.AddConstraint(TriggerType.OnUpdate,"Name Not Null", (oldItem, newItem) => newItem.name != null);
         var row = table.Add(new TestRow() { name = "srw" });
         table.Commit();
         Assert.AreEqual(0, (int)row.id);

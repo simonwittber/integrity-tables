@@ -25,7 +25,7 @@ public partial class Table<T>
             throw new UncommittedException("Row has not been committed, cannot modify it.");
         var oldData = currentRow.data;
         if (BeforeUpdate != null) newData = BeforeUpdate(oldData, newData);
-        _constraints.CheckConstraintsForItem(TriggerType.OnUpdate, newData);
+        _constraints.CheckConstraintsForItem(TriggerType.OnUpdate, oldData, newData);
         currentRow.data = newData;
         currentRow.committed = false;
         SetRow(index, currentRow);

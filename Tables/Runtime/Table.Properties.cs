@@ -7,7 +7,7 @@ public partial class Table<T>
     public string[] FieldNames => _fieldIndexer.Names();
         
     public Type[] Types => _fieldIndexer.Types();
-        
+
     public int RowCount
     {
         get
