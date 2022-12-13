@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 
 namespace IntegrityTables;
@@ -36,6 +37,7 @@ internal class ConstraintCollection<T> where T : struct
     public void AddWeakRelationship(WeakKeyGetterDelegate<T> getWeakKeyFn, WeakKeySetterDelegate<T> setWeakKeyFn, ITable foreignTable, CascadeOperation cascadeOperation)
     {
         var constraintName = $"fk:{typeof(T).Name}=>{foreignTable.Name}";
+        Console.WriteLine($"Adding weak constraint: {constraintName}");
         Add(TriggerType.OnUpdate, constraintName, (oldRow, newRow) =>
         {
             var fk = getWeakKeyFn(newRow);
@@ -68,10 +70,19 @@ internal class ConstraintCollection<T> where T : struct
     public void AddStrongRelationship(StrongKeyGetterDelegate<T> getForeignKeyFn, StrongKeySetterDelegate<T> setForeignKeyFn, ITable foreignTable, CascadeOperation cascadeOperation)
     {
         var constraintName = $"fk:{typeof(T).Name}=>{foreignTable.Name}";
+        Console.WriteLine($"Adding strong constraint: {constraintName}");
         Add(TriggerType.OnUpdate, constraintName, (oldRow, newRow) =>
         {
+            Console.WriteLine($"Checking strong constraint: {constraintName}");
             var fk = getForeignKeyFn(newRow);
             if (fk == getForeignKeyFn(oldRow)) return true;
+            return foreignTable.ContainsKey(fk);
+        });
+
+        Add(TriggerType.OnCreate, constraintName, (oldRow, newRow) =>
+        {
+            Console.WriteLine($"Checking strong constraint: {constraintName}");
+            var fk = getForeignKeyFn(newRow);
             return foreignTable.ContainsKey(fk);
         });
 

@@ -19,7 +19,7 @@ namespace IntegrityTables
         private readonly UniqueIndex<T> _uniqueIndex;
         private readonly ConstraintCollection<T> _constraints;
 
-        private int _idCount = 0;
+        private int _idCount = 1;
 
         internal Table(IFieldIndexer fieldIndexer, PrimaryKeyGetterDelegate<T> getPrimaryKey, PrimaryKeySetterDelegate<T> setPrimaryKey = null)
         {
