@@ -82,4 +82,5 @@ It aims to provide a zero allocation API, with patterns to maximize CPU cache / 
         // at this point, the instances table contains the above row.
         db.Rollback();
         // but after a rollback, it is gone.
+    }
 ```
